@@ -110,14 +110,12 @@ if st.button("Run Evaluation"):
         st.markdown("#### Agent Decision Analysis")
         col_tbl, col_bar = st.columns([1.2, 1])
         with col_tbl:
-            # == [수정됨] 테이블 수치 소수점 2째자리 고정 ==
             styled_df = df_log.set_index("Day").style.map(style_dataframe).format({"Vanilla Return(%)": "{:.2f}", "STATIC Return(%)": "{:.2f}"})
             st.dataframe(styled_df, height=350, use_container_width=True)
         with col_bar:
             dist_counts = df_log['STATIC Pick (Ours)'].value_counts().reset_index()
             dist_counts.columns = ['Ticker', 'Buy Count']
             fig_bar = px.bar(dist_counts, x='Ticker', y='Buy Count', title="<b>Frequency of Safe-Asset Selection</b>", color='Buy Count', color_continuous_scale='Blues')
-            # == [수정됨] 가로축 라벨 크기 축소 (size=11) 및 45도 기울임(tickangle) 적용 ==
             fig_bar.update_layout(
                 title=dict(font=dict(size=24, color='black', family="Arial Black")),
                 xaxis=dict(titlefont=dict(size=20, color='black', family="Arial Black"), tickfont=dict(size=11, color='black', family="Arial Black"), tickangle=-45, dtick=1),
@@ -134,10 +132,15 @@ if len(st.session_state.trial_history) > 0:
     
     win_count = (history_df['STATIC Final (%)'] > history_df['Vanilla Final (%)']).sum()
     win_rate = (win_count / len(history_df)) * 100
-    avg_static = history_df['STATIC Final (%)'].mean()
-    avg_vanilla = history_df['Vanilla Final (%)'].mean()
-    avg_spy = history_df['SPY Final (%)'].mean()
     
+    # 평균 및 중앙값 계산
+    avg_static = history_df['STATIC Final (%)'].mean()
+    median_static = history_df['STATIC Final (%)'].median()
+    
+    avg_vanilla = history_df['Vanilla Final (%)'].mean()
+    median_vanilla = history_df['Vanilla Final (%)'].median()
+    
+    avg_spy = history_df['SPY Final (%)'].mean()
     alpha = avg_static - avg_spy
     
     st.info(f"### 누적 승률 (Win Rate): {win_rate:.1f}% (STATIC 모델이 Vanilla를 이긴 비율) | 평균 수익률: STATIC {avg_static:.2f}% vs Vanilla {avg_vanilla:.2f}%")
@@ -154,12 +157,33 @@ if len(st.session_state.trial_history) > 0:
         fig_box.add_trace(go.Box(y=history_df['Vanilla Final (%)'], name='<b>Vanilla RL</b>', line=dict(color='red', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True))
         fig_box.add_trace(go.Box(y=history_df['STATIC Final (%)'], name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True))
         
-        # == [수정됨] 세로축 라벨 크기 축소 (titlefont size=16, tickfont size=16) ==
+        # == 1. 평균 및 중앙값 수치 라벨 추가 (xshift를 이용해 박스 좌우에 배치) ==
+        # Vanilla RL 라벨
+        fig_box.add_annotation(x='<b>Vanilla RL</b>', y=avg_vanilla, text=f"Mean: {avg_vanilla:.2f}%", showarrow=False, xshift=75, font=dict(color='red', size=13, family="Arial Black"))
+        fig_box.add_annotation(x='<b>Vanilla RL</b>', y=median_vanilla, text=f"Median: {median_vanilla:.2f}%", showarrow=False, xshift=-80, font=dict(color='red', size=13, family="Arial Black"))
+        
+        # STATIC RL 라벨
+        fig_box.add_annotation(x='<b>STATIC RL (Ours)</b>', y=avg_static, text=f"Mean: {avg_static:.2f}%", showarrow=False, xshift=75, font=dict(color='blue', size=13, family="Arial Black"))
+        fig_box.add_annotation(x='<b>STATIC RL (Ours)</b>', y=median_static, text=f"Median: {median_static:.2f}%", showarrow=False, xshift=-80, font=dict(color='blue', size=13, family="Arial Black"))
+
+        # == 2. 점선/실선 안내 라벨창 삽입 ==
+        fig_box.add_annotation(
+            xref="paper", yref="paper",
+            x=0.01, y=0.98, # 그래프 좌측 상단 배치
+            text="<b>[Box Line Guide]</b><br>점선(- - -) : 평균(Mean)<br>실선(──) : 중앙값(Median)",
+            showarrow=False,
+            font=dict(size=14, color="black", family="Arial Black"),
+            bgcolor="rgba(255,255,255,0.9)",
+            bordercolor="black",
+            borderwidth=2,
+            align="left"
+        )
+
         fig_box.update_layout(
             title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=28, color='black', family="Arial Black")),
             yaxis=dict(title="<b>Final Cumulative Return (%)</b>", titlefont=dict(size=16, color='black', family="Arial Black"), tickfont=dict(size=16, color='black', family="Arial Black")),
             xaxis=dict(tickfont=dict(size=20, color='black', family="Arial Black")),
-            plot_bgcolor='white', height=400, margin=dict(t=60, b=40, l=60, r=40)
+            plot_bgcolor='white', height=450, margin=dict(t=60, b=40, l=60, r=40) # 라벨 공간 확보를 위해 높이(height) 증가
         )
         
         fig_box.add_hline(y=0, line_width=2, line_color="black", opacity=1.0)
@@ -180,9 +204,8 @@ if len(st.session_state.trial_history) > 0:
         st.plotly_chart(fig_box, use_container_width=True)
         
     with col_hist_table:
-        # == [수정됨] 테이블 수치 소수점 2째자리 고정 ==
         styled_history_df = history_df.set_index("Trial").style.map(style_dataframe).format({"Vanilla Final (%)": "{:.2f}", "STATIC Final (%)": "{:.2f}", "SPY Final (%)": "{:.2f}"})
-        st.dataframe(styled_history_df, height=400, use_container_width=True)
+        st.dataframe(styled_history_df, height=450, use_container_width=True)
     
     st.markdown("---")
     st.markdown("#### 차트 해석 가이드: 박스 내부의 점선(- - -)은 평균값(Mean), 실선(—)은 중앙값(Median)입니다. 가로로 뻗은 초록색 점선은 S&P 500 시장 지수입니다.")
