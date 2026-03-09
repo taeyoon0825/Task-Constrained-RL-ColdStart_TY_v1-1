@@ -127,8 +127,25 @@ if len(st.session_state.trial_history) > 0:
     with col_box:
         fig_box = go.Figure()
         # == 박스 폭 조절 및 투명화 ==
-        fig_box.add_trace(go.Box(y=history_df['Vanilla Final (%)'], name='<b>Vanilla RL</b>', line=dict(color='red', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.4))
-        fig_box.add_trace(go.Box(y=history_df['STATIC RL (Ours)'], name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.4))
+        # 'STATIC RL (Ours)' 대신 실제 데이터가 담긴 'STATIC Final (%)'을 사용합니다.
+        fig_box.add_trace(go.Box(
+            y=history_df['STATIC Final (%)'], 
+            name='<b>STATIC RL (Ours)</b>', 
+            line=dict(color='blue', width=2), 
+            fillcolor='rgba(0,0,0,0)', 
+            boxmean=True, 
+            width=0.4
+        ))
+
+        # Vanilla 부분도 동일하게 맞춰줍니다.
+        fig_box.add_trace(go.Box(
+            y=history_df['Vanilla Final (%)'], 
+            name='<b>Vanilla RL</b>', 
+            line=dict(color='red', width=2), 
+            fillcolor='rgba(0,0,0,0)', 
+            boxmean=True, 
+            width=0.4
+        ))
         
         # == 안내 라벨창 (중앙 상단 배치) ==
         fig_box.add_annotation(xref="paper", yref="paper", x=0.5, y=1.18, text="<b>[Box Line Guide]</b><br>점선(- - -) : 평균(Mean) | 실선(──) : 중앙값(Median)", showarrow=False, font=dict(size=14, color="black", family="Arial Black"), bgcolor="rgba(255,255,255,0.9)", bordercolor="black", borderwidth=2, align="center")
