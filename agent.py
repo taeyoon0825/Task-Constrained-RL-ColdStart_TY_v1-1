@@ -18,7 +18,8 @@ class SP500Environment:
     @st.cache_data(ttl=3600)
     def _download_data(_self):
         # 벤치마크를 포함하여 데이터 다운로드
-        data = yf.download(_self.all_symbols, period="6mo", interval="1d")['Close']
+        # 6mo(6개월)에서 5y(5년, 약 1260 거래일)로 기간 대폭 확장
+        data = yf.download(_self.all_symbols, period="5y", interval="1d")['Close']
         data = data.ffill().bfill().dropna(axis=1)
         
         # 에이전트가 선택할 수 있는 종목풀(tickers)에서 SPY는 제외

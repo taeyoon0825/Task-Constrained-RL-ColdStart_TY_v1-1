@@ -27,17 +27,26 @@ with st.spinner('>> 실시간 S&P 500 데이터를 분석 중입니다...'):
     agent_static = RecommendationAgent(env, use_constraints=True)
 
 st.sidebar.markdown("### >> Test Parameters")
+# 보유한 데이터의 최대 거래일수 계산
 max_episodes = len(env.data) - 20 - 1 if len(env.data) > 20 else 100
-episodes = st.sidebar.slider("Episodes (Trading Days)", 10, max_episodes, min(100, max_episodes))
-speed = st.sidebar.slider("Frame Speed (sec)", 0.0, 0.5, 0.05)
+
+# 슬라이더의 최대 한도를 100에서 max_episodes로 확장 (기본 세팅값을 500이나 1000으로 조정 가능)
+episodes = st.sidebar.slider("Episodes (Trading Days)", 10, max_episodes, min(1000, max_episodes))
+speed = st.sidebar.slider("Frame Speed (sec)", 0.0, 0.5, 0.0) # 기본 속도를 0.0(즉시 표시)으로 낮추는 것을 추천
 
 # == Plotly 차트: S&P 500 벤치마크 추가 ==
 fig = go.Figure()
 
 fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>Vanilla RL (Unconstrained)</b>', line=dict(color='red', width=3), marker=dict(symbol='circle-open', size=8, line_width=2)))
 fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>RL with STATIC (Ours)</b>', line=dict(color='blue', width=3), marker=dict(symbol='square-open', size=8, line_width=2)))
-# !! [개선] S&P 500 초록색 점선 추가
-fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines', name='<b>S&P 500 Index (SPY)</b>', line=dict(color='green', width=3, dash='dash')))
+# !! [개선] S&P 500 초록색 촘촘한 점선 및 빈 마름모 마커 추가
+fig.add_trace(go.Scatter(
+    x=[0], y=[0], 
+    mode='lines+markers', 
+    name='<b>S&P 500 Index (SPY)</b>', 
+    line=dict(color='green', width=3, dash='dot'), # 'dash' 대신 'dot'을 사용하여 촘촘한 점선 구현
+    marker=dict(symbol='diamond-open', size=8, line_width=2) # 빈 마름모 기호 적용
+))
 
 fig.update_layout(
     title=dict(text="<b>Cumulative Return Comparison (S&P 500)</b>", font=dict(size=28, color='black')),
@@ -66,7 +75,7 @@ if st.button(">> Run Evaluation"):
 
     for i in range(20, 20 + episodes):
         ticker_u, _, r_u = agent_raw.select_action(current_step=i)
-        # ticker_s, _, r_s = agent_static.select_action(current_step=i)
+        ticker_s, _, r_s = agent_static.select_action(current_step=i)
         
         # == [수정된 부분] SPY 벤치마크 일일 수익률 계산 (결측치 방어 로직) ==
         if 'SPY' in env.data.columns:
@@ -76,7 +85,7 @@ if st.button(">> Run Evaluation"):
         else:
             r_b = 0.0 # SPY 데이터가 없을 경우 0%로 처리하여 서버 중단 방지
             
-        # h_u.append(h_u[-1] + r_u)
+        h_u.append(h_u[-1] + r_u)
         h_s.append(h_s[-1] + r_s)
         h_b.append(h_b[-1] + r_b)
         current_day = i - 19
