@@ -6,24 +6,20 @@ import plotly.graph_objects as go
 import plotly.express as px
 from agent import SP500Environment, RecommendationAgent
 
-# CSS: 텍스트 크기 확대, 굵게 처리, 색상 지정
+# == [UI 개선] CSS: 메트릭 라벨 강제 확대/색상 지정 및 전체 텍스트 굵게 ==
 st.markdown("""
 <style>
-/* 지표 라벨 색상 및 폰트 크기 강제 지정 */
-div[data-testid="column"]:nth-of-type(1) div[data-testid="stMetricLabel"] p { color: red !important; font-weight: 900 !important; font-size: 1.4rem !important; }
-div[data-testid="column"]:nth-of-type(2) div[data-testid="stMetricLabel"] p { color: blue !important; font-weight: 900 !important; font-size: 1.4rem !important; }
-div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricLabel"] p { color: green !important; font-weight: 900 !important; font-size: 1.4rem !important; }
+/* 지표 라벨 색상 및 폰트 크기 강제 지정 (가독성 극대화) */
+div[data-testid="column"]:nth-of-type(1) [data-testid="stMetricLabel"] * { color: red !important; font-weight: 900 !important; font-size: 1.4rem !important; }
+div[data-testid="column"]:nth-of-type(2) [data-testid="stMetricLabel"] * { color: blue !important; font-weight: 900 !important; font-size: 1.4rem !important; }
+div[data-testid="column"]:nth-of-type(3) [data-testid="stMetricLabel"] * { color: green !important; font-weight: 900 !important; font-size: 1.4rem !important; }
 
 /* 지표 결과 수치 폰트 크기 확대 */
 div[data-testid="stMetricValue"] { font-weight: 900 !important; font-size: 2.2rem !important; }
-
-/* 전체 텍스트 굵게 처리 */
-.stMarkdown p, .stMarkdown li { font-size: 1.1rem !important; font-weight: bold !important; color: black !important; }
 </style>
 """, unsafe_allow_html=True)
 
 st.set_page_config(page_title="Test-Constrained-RL", layout="wide")
-
 st.markdown("## Test-Constrained-RL-ColdStart: S&P 500 Performance")
 
 if 'trial_history' not in st.session_state:
@@ -39,12 +35,12 @@ max_episodes = len(env.data) - 20 - 1 if len(env.data) > 20 else 100
 episodes = st.sidebar.slider("Episodes (Trading Days)", 10, max_episodes, min(100, max_episodes))
 speed = st.sidebar.slider("Frame Speed (sec)", 0.0, 0.5, 0.05)
 
-# Plotly 차트 설정
+# == Plotly 차트: 심벌 축소 및 선 두께 얇게 조정 ==
 fig = go.Figure()
 
-fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>Vanilla RL (Unconstrained)</b>', line=dict(color='red', width=4), marker=dict(symbol='circle-open', size=10, line_width=3)))
-fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>RL with STATIC (Ours)</b>', line=dict(color='blue', width=4), marker=dict(symbol='square-open', size=10, line_width=3)))
-fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>S&P 500 Index (SPY)</b>', line=dict(color='green', width=4, dash='dot'), marker=dict(symbol='diamond-open', size=10, line_width=3)))
+fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>Vanilla RL (Unconstrained)</b>', line=dict(color='red', width=2), marker=dict(symbol='circle-open', size=6, line_width=1.5)))
+fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>RL with STATIC (Ours)</b>', line=dict(color='blue', width=2), marker=dict(symbol='square-open', size=6, line_width=1.5)))
+fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>S&P 500 Index (SPY)</b>', line=dict(color='green', width=2, dash='dot'), marker=dict(symbol='diamond-open', size=6, line_width=1.5)))
 
 fig.update_layout(
     title=dict(text="<b>Cumulative Return Comparison (S&P 500)</b>", font=dict(size=32, color='black', family="Arial Black")),
@@ -53,7 +49,7 @@ fig.update_layout(
     legend=dict(font=dict(size=24, color='black', family="Arial Black"), x=0.01, y=0.99, borderwidth=2, bgcolor='rgba(0,0,0,0)'),
     plot_bgcolor='white', height=600, margin=dict(t=80, b=80, l=80, r=40)
 )
-fig.add_hline(y=0, line_width=4, line_color="black", opacity=1.0)
+fig.add_hline(y=0, line_width=2, line_color="black", opacity=1.0)
 
 chart_view = st.empty()
 chart_view.plotly_chart(fig, use_container_width=True)
@@ -66,7 +62,6 @@ m_b = col3.empty()
 st.markdown("---")
 analysis_view = st.empty()
 
-# 데이터프레임 음수 붉은색 처리를 위한 스타일 함수
 def style_dataframe(val):
     if isinstance(val, (int, float)):
         color = 'red' if val < 0 else 'black'
@@ -124,7 +119,7 @@ if st.button("Run Evaluation"):
         with col_bar:
             dist_counts = df_log['STATIC Pick (Ours)'].value_counts().reset_index()
             dist_counts.columns = ['Ticker', 'Buy Count']
-            fig_bar = px.bar(dist_counts, x='Ticker', y='Buy Count', title="Frequency of Safe-Asset Selection", color='Buy Count', color_continuous_scale='Blues')
+            fig_bar = px.bar(dist_counts, x='Ticker', y='Buy Count', title="<b>Frequency of Safe-Asset Selection</b>", color='Buy Count', color_continuous_scale='Blues')
             fig_bar.update_layout(
                 title=dict(font=dict(size=24, color='black', family="Arial Black")),
                 xaxis=dict(titlefont=dict(size=20, color='black', family="Arial Black"), tickfont=dict(size=16, color='black', family="Arial Black")),
@@ -147,21 +142,21 @@ if len(st.session_state.trial_history) > 0:
     
     alpha = avg_static - avg_spy
     
-    st.info(f"누적 승률 (Win Rate): {win_rate:.1f}% (STATIC 모델이 Vanilla를 이긴 비율) | 평균 수익률: STATIC {avg_static:.2f}% vs Vanilla {avg_vanilla:.2f}%")
+    # == 통계 텍스트 사이즈 대폭 확대 (H3 태그 적용) ==
+    st.info(f"### 누적 승률 (Win Rate): {win_rate:.1f}% (STATIC 모델이 Vanilla를 이긴 비율) | 평균 수익률: STATIC {avg_static:.2f}% vs Vanilla {avg_vanilla:.2f}%")
     
     if alpha > 0:
-        st.info(f"S&P 500 대비 성과 (Alpha): 시장 평균({avg_spy:.2f}%) 대비 +{alpha:.2f}%p 초과 수익 달성")
+        st.success(f"### S&P 500 대비 성과 (Alpha): 시장 평균({avg_spy:.2f}%) 대비 +{alpha:.2f}%p 초과 수익 달성")
     else:
-        st.warning(f"S&P 500 대비 성과 (Alpha): 시장 평균({avg_spy:.2f}%) 대비 {alpha:.2f}%p 하회")
+        st.warning(f"### S&P 500 대비 성과 (Alpha): 시장 평균({avg_spy:.2f}%) 대비 {alpha:.2f}%p 하회")
 
-    st.markdown("차트 해석 가이드: 박스 내부의 점선(- - -)은 평균값(Mean), 실선(—)은 중앙값(Median)입니다. 가로로 뻗은 초록색 점선은 S&P 500 시장 지수입니다.")
-    
     col_box, col_hist_table = st.columns([2, 1])
     
     with col_box:
         fig_box = go.Figure()
-        fig_box.add_trace(go.Box(y=history_df['Vanilla Final (%)'], name='<b>Vanilla RL</b>', marker_color='red', boxmean=True))
-        fig_box.add_trace(go.Box(y=history_df['STATIC Final (%)'], name='<b>STATIC RL (Ours)</b>', marker_color='blue', boxmean=True))
+        # == 박스 플롯 내부 투명화 (fillcolor), 테두리 및 라인 설정 ==
+        fig_box.add_trace(go.Box(y=history_df['Vanilla Final (%)'], name='<b>Vanilla RL</b>', line=dict(color='red', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True))
+        fig_box.add_trace(go.Box(y=history_df['STATIC Final (%)'], name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True))
         
         fig_box.update_layout(
             title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=28, color='black', family="Arial Black")),
@@ -170,12 +165,21 @@ if len(st.session_state.trial_history) > 0:
             plot_bgcolor='white', height=400, margin=dict(t=60, b=40, l=60, r=40)
         )
         
-        fig_box.add_hline(y=0, line_width=3, line_color="black", opacity=1.0)
+        fig_box.add_hline(y=0, line_width=2, line_color="black", opacity=1.0)
         
+        # == S&P 500 기준선 얇게 조정 및 텍스트 양분 (우측 텍스트, 좌측 수치) ==
+        # 1. 우측 텍스트 (S&P 500)
         fig_box.add_hline(
-            y=avg_spy, line_width=4, line_dash="dot", line_color="green",
-            annotation_text=f"S&P 500 (SPY): {avg_spy:.2f}%", 
+            y=avg_spy, line_width=1.5, line_dash="dot", line_color="green",
+            annotation_text="<b>S&P 500</b>", 
             annotation_position="top right", 
+            annotation_font=dict(color="green", size=18, family="Arial Black")
+        )
+        # 2. 좌측 수치 (투명한 선을 겹쳐 그려 좌측에 어노테이션 추가)
+        fig_box.add_hline(
+            y=avg_spy, line_width=0,
+            annotation_text=f"<b>{avg_spy:.2f}%</b>", 
+            annotation_position="top left", 
             annotation_font=dict(color="green", size=18, family="Arial Black")
         )
         
@@ -184,3 +188,7 @@ if len(st.session_state.trial_history) > 0:
     with col_hist_table:
         styled_history_df = history_df.set_index("Trial").style.map(style_dataframe)
         st.dataframe(styled_history_df, height=400, use_container_width=True)
+    
+    # == 가이드 텍스트 맨 아래로 이동 및 굵게 처리 ==
+    st.markdown("---")
+    st.markdown("#### 차트 해석 가이드: 박스 내부의 점선(- - -)은 평균값(Mean), 실선(—)은 중앙값(Median)입니다. 가로로 뻗은 초록색 점선은 S&P 500 시장 지수입니다.")
