@@ -6,17 +6,20 @@ import plotly.graph_objects as go
 import plotly.express as px
 from agent import SP500Environment, RecommendationAgent
 
-# == [UI 개선] CSS: 메트릭/테이블 헤더/텍스트 스타일 일괄 적용 ==
+# == [UI 개선] CSS: 전역 텍스트 확대 제거 및 특정 요소 핀포인트 스타일링 ==
+# 이 CSS는 그래프 외부의 지표 카드(Metric)와 테이블 헤더의 가독성만 개선합니다.
 st.markdown("""
 <style>
-/* 지표 라벨 색상 및 폰트 크기 강제 지정 */
-div[data-testid="column"]:nth-of-type(1) [data-testid="stMetricLabel"] * { color: red !important; font-weight: 900 !important; font-size: 1.6rem !important; }
-div[data-testid="column"]:nth-of-type(2) [data-testid="stMetricLabel"] * { color: blue !important; font-weight: 900 !important; font-size: 1.6rem !important; }
-div[data-testid="column"]:nth-of-type(3) [data-testid="stMetricLabel"] * { color: green !important; font-weight: 900 !important; font-size: 1.6rem !important; }
-div[data-testid="stMetricValue"] { font-weight: 900 !important; font-size: 2.2rem !important; }
+/* 1. 상단 지표 카드(Metric) 라벨 색상 및 크기 강제 지정 */
+div[data-testid="column"]:nth-of-type(1) [data-testid="stMetricLabel"] * { color: red !important; font-weight: 900 !important; font-size: 1.2rem !important; }
+div[data-testid="column"]:nth-of-type(2) [data-testid="stMetricLabel"] * { color: blue !important; font-weight: 900 !important; font-size: 1.2rem !important; }
+div[data-testid="column"]:nth-of-type(3) [data-testid="stMetricLabel"] * { color: green !important; font-weight: 900 !important; font-size: 1.2rem !important; }
 
-/* 테이블 헤더 스타일 조정 (검정색, 굵게, 크게) */
-thead tr th { font-size: 20px !important; color: black !important; font-weight: 900 !important; }
+/* 2. 지표 결과 수치 폰트 크기 확대 */
+div[data-testid="stMetricValue"] { font-weight: 900 !important; font-size: 2.0rem !important; }
+
+/* 3. 테이블 헤더 스타일 조정 (검정색, 굵게) */
+thead tr th { font-size: 18px !important; color: black !important; font-weight: 900 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -36,20 +39,22 @@ max_episodes = len(env.data) - 20 - 1 if len(env.data) > 20 else 100
 episodes = st.sidebar.slider("Episodes (Trading Days)", 10, max_episodes, min(100, max_episodes))
 speed = st.sidebar.slider("Frame Speed (sec)", 0.0, 0.5, 0.0)
 
-# == 메인 시뮬레이션 차트 ==
+# == 1. 메인 시뮬레이션 차트 (레이아웃 복구) ==
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>Vanilla RL (Unconstrained)</b>', line=dict(color='red', width=2), marker=dict(symbol='circle-open', size=6, line_width=1.5)))
 fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>RL with STATIC (Ours)</b>', line=dict(color='blue', width=2), marker=dict(symbol='square-open', size=6, line_width=1.5)))
 fig.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>S&P 500 Index (SPY)</b>', line=dict(color='green', width=2, dash='dot'), marker=dict(symbol='diamond-open', size=6, line_width=1.5)))
 
 fig.update_layout(
-    title=dict(text="<b>Cumulative Return Comparison (S&P 500)</b>", font=dict(size=32, color='black', family="Arial Black")),
-    xaxis=dict(title="<b>Trading Days</b>", titlefont=dict(size=26, color='black', family="Arial Black"), tickfont=dict(size=20, color='black', family="Arial Black"), showgrid=True, gridcolor='lightgray'),
-    yaxis=dict(title="<b>Total Cumulative Return (%)</b>", titlefont=dict(size=26, color='black', family="Arial Black"), tickfont=dict(size=20, color='black', family="Arial Black"), showgrid=True, gridcolor='lightgray'),
-    legend=dict(font=dict(size=24, color='black', family="Arial Black"), x=0.01, y=0.99, borderwidth=2, bgcolor='rgba(0,0,0,0)'),
-    plot_bgcolor='white', height=600, margin=dict(t=80, b=80, l=80, r=40)
+    title=dict(text="<b>Cumulative Return Comparison (S&P 500)</b>", font=dict(size=28, color='black')),
+    # 폰트 사이즈를 Plotly 표준(Title 16, Tick 14)으로 되돌려 겹침 방지
+    xaxis=dict(title="<b>Trading Days</b>", titlefont=dict(size=18), tickfont=dict(size=14), showgrid=True),
+    yaxis=dict(title="<b>Total Cumulative Return (%)</b>", titlefont=dict(size=18), tickfont=dict(size=14), showgrid=True),
+    # 범례 위치와 마진 조정 (Title과 겹침 방지)
+    legend=dict(font=dict(size=16), x=0.01, y=0.98, borderwidth=1, bgcolor='rgba(255,255,255,0.8)'),
+    plot_bgcolor='white', height=550, margin=dict(t=100, b=80, l=80, r=40)
 )
-fig.add_hline(y=0, line_width=2, line_color="black", opacity=1.0)
+fig.add_hline(y=0, line_width=2, line_color="black")
 
 chart_view = st.empty()
 chart_view.plotly_chart(fig, use_container_width=True)
@@ -60,6 +65,7 @@ m_u = col1.empty(); m_s = col2.empty(); m_b = col3.empty()
 st.markdown("---")
 analysis_view = st.empty()
 
+# 테이블 스타일링 함수
 def style_dataframe(val):
     if isinstance(val, (int, float)):
         color = 'red' if val < 0 else 'black'
@@ -71,9 +77,7 @@ if st.button("Run Evaluation"):
     log_data = []
 
     for i in range(20, 20 + episodes):
-        ticker_u, _, r_u = agent_raw.select_action(current_step=i)
-        ticker_s, _, r_s = agent_static.select_action(current_step=i)
-        
+        ticker_u, _, r_u = agent_raw.select_action(current_step=i); ticker_s, _, r_s = agent_static.select_action(current_step=i)
         if 'SPY' in env.data.columns:
             spy_curr = float(env.data['SPY'].iloc[i]); spy_next = float(env.data['SPY'].iloc[i+1])
             r_b = ((spy_next - spy_curr) / spy_curr) * 100 if spy_curr > 0 else 0.0
@@ -81,7 +85,6 @@ if st.button("Run Evaluation"):
             
         h_u.append(h_u[-1] + r_u); h_s.append(h_s[-1] + r_s); h_b.append(h_b[-1] + r_b)
         current_day = i - 19; steps.append(current_day) 
-        
         log_data.append({"Day": current_day, "Vanilla Pick": ticker_u, "Vanilla Return(%)": r_u, "STATIC Pick (Ours)": ticker_s, "STATIC Return(%)": r_s})
         
         fig.data[0].x = steps; fig.data[0].y = h_u
@@ -107,78 +110,62 @@ if st.button("Run Evaluation"):
             dist_counts = df_log['STATIC Pick (Ours)'].value_counts().reset_index()
             dist_counts.columns = ['Ticker', 'Buy Count']
             fig_bar = px.bar(dist_counts, x='Ticker', y='Buy Count', title="<b>Frequency of Safe-Asset Selection</b>", color='Buy Count', color_continuous_scale='Blues')
-            fig_bar.update_layout(title=dict(font=dict(size=24, color='black', family="Arial Black")), xaxis=dict(tickfont=dict(size=11), tickangle=-45, dtick=1), yaxis=dict(tickfont=dict(size=16)), plot_bgcolor='white', height=350)
+            fig_bar.update_layout(title=dict(font=dict(size=22)), xaxis=dict(tickfont=dict(size=11), tickangle=-45), yaxis=dict(tickfont=dict(size=14)), plot_bgcolor='white', height=350)
             st.plotly_chart(fig_bar, use_container_width=True)
 
+# == 2. 하단: 통계 분석 박스 플롯 (망가진 레이아웃 완벽 복구) ==
 if len(st.session_state.trial_history) > 0:
     st.markdown("---")
     st.markdown("### Trial History: Statistical Superiority Analysis")
     history_df = pd.DataFrame(st.session_state.trial_history)
-    win_rate = ((history_df['STATIC Final (%)'] > history_df['Vanilla Final (%)']).sum() / len(history_df)) * 100
+    
+    # 통계 계산
     avg_static = history_df['STATIC Final (%)'].mean(); median_static = history_df['STATIC Final (%)'].median()
     avg_vanilla = history_df['Vanilla Final (%)'].mean(); median_vanilla = history_df['Vanilla Final (%)'].median()
-    avg_spy = history_df['SPY Final (%)'].mean(); alpha = avg_static - avg_spy
+    avg_spy = history_df['SPY Final (%)'].mean()
     
-    st.info(f"### 누적 승률 (Win Rate): {win_rate:.1f}% (STATIC 모델이 Vanilla를 이긴 비율) | 평균 수익률: STATIC {avg_static:.2f}% vs Vanilla {avg_vanilla:.2f}%")
-    if alpha > 0: st.success(f"### S&P 500 대비 성과 (Alpha): 시장 평균({avg_spy:.2f}%) 대비 +{alpha:.2f}%p 초과 수익 달성")
-    else: st.warning(f"### S&P 500 대비 성과 (Alpha): 시장 평균({avg_spy:.2f}%) 대비 {alpha:.2f}%p 하회")
+    # Alpha 요약 텍스트
+    st.success(f"시장 평균({avg_spy:.2f}%) 대비 **Alpha 성과**: STATIC **{avg_static - avg_spy:.2f}%p** | Vanilla **{avg_vanilla - avg_spy:.2f}%p**")
 
     col_box, col_hist_table = st.columns([2, 1])
     with col_box:
         fig_box = go.Figure()
         
-        # == [수정됨] 두 막대기를 중앙(x="")으로 모으고 offsetgroup으로 밀착 ==
-        # width를 0.3으로 슬림하게 유지하면서 offsetgroup과 boxgroupgap=0을 사용하여 완전히 붙입니다.
-        fig_box.add_trace(go.Box(
-            x=["<b>Performance Comparison</b>"], y=history_df['Vanilla Final (%)'], 
-            name='<b>Vanilla RL</b>', line=dict(color='red', width=2), 
-            fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.3, offsetgroup='A'
-        ))
-        fig_box.add_trace(go.Box(
-            x=["<b>Performance Comparison</b>"], y=history_df['STATIC Final (%)'], 
-            name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=2), 
-            fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.3, offsetgroup='B'
-        ))
+        # == [복구 포인트 1] 두 막대기 중앙 밀착 및 너비 슬림화 ==
+        # x축을 Performance Comparison으로 통일하고, boxmode='group', boxgroupgap=0을 적용하여 완전히 붙임
+        fig_box.add_trace(go.Box(x=["Performance Comparison"], y=history_df['Vanilla Final (%)'], name='<b>Vanilla RL</b>', line=dict(color='red', width=1.5), fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.35))
+        fig_box.add_trace(go.Box(x=["Performance Comparison"], y=history_df['STATIC Final (%)'], name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=1.5), fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.35))
         
-        # == [요청 반영] 안내 라벨창을 우측 상단으로 이동 및 줄바꿈 ==
-        # x=1.0 (우측 끝) 근처로 이동시켜 중앙의 막대기와 겹치지 않게 합니다.
-        fig_box.add_annotation(
-            xref="paper", yref="paper", x=1.0, y=1.15, 
-            text="<b>[Box Line Guide]</b><br>점선(- - -) : 평균(Mean)<br>실선(──) : 중앙값(Median)", 
-            showarrow=False, font=dict(size=14, color="black", family="Arial Black"), 
-            bgcolor="rgba(255,255,255,0.9)", bordercolor="black", borderwidth=2, align="center"
-        )
+        # == [복구 포인트 2] 안내 라벨창 (우측 상단, 타이틀과 분리) ==
+        # xref='paper', x=1.0으로 우측 끝에 배치하고 줄바꿈 적용. 겹침 절대 방지
+        fig_box.add_annotation(xref="paper", yref="paper", x=1.0, y=1.12, text="<b>[Box Line Guide]</b><br>점선(- - -): Mean<br>실선(──): Median", showarrow=False, font=dict(size=12, color="black"), bgcolor="rgba(255,255,255,0.9)", bordercolor="black", borderwidth=1, align="center")
         
-        # == [요청 반영] 수치 라벨 (박스 외부: 점선-왼쪽, 실선-오른쪽) ==
-        # 중앙으로 모인 두 박스의 위치(offset)에 맞춰 xshift를 정밀 조정했습니다.
-        # Vanilla (좌측 박스)
-        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=avg_vanilla, text=f"<b>{avg_vanilla:.2f}%</b>", showarrow=False, xshift=-105, font=dict(color='red', size=14, family="Arial Black"))
-        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=median_vanilla, text=f"<b>{median_vanilla:.2f}%</b>", showarrow=False, xshift=-35, font=dict(color='red', size=14, family="Arial Black"))
-        # STATIC (우측 박스)
-        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=avg_static, text=f"<b>{avg_static:.2f}%</b>", showarrow=False, xshift=35, font=dict(color='blue', size=14, family="Arial Black"))
-        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=median_static, text=f"<b>{median_static:.2f}%</b>", showarrow=False, xshift=105, font=dict(color='blue', size=14, family="Arial Black"))
+        # == [복구 포인트 3] 수치 라벨 날개형 배치 및 폰트 축소 (0% 표시) ==
+        # 박스 외부 좌우로 대칭 배치하여 겹침 방지. 수치(Mean, Median)의 `%`값만 크게 표시
+        # Vanilla (좌측 박스) - Mean(점선): -120, Median(실선): -60
+        fig_box.add_annotation(x="Performance Comparison", y=avg_vanilla, text=f"<b>{avg_vanilla:.2f}%</b>", showarrow=False, xshift=-120, font=dict(color='red', size=14))
+        fig_box.add_annotation(x="Performance Comparison", y=median_vanilla, text=f"<b>{median_vanilla:.2f}%</b>", showarrow=False, xshift=-60, font=dict(color='red', size=14))
+        # STATIC (우측 박스) - Median(실선): 60, Mean(점선): 120
+        fig_box.add_annotation(x="Performance Comparison", y=median_static, text=f"<b>{median_static:.2f}%</b>", showarrow=False, xshift=60, font=dict(color='blue', size=14))
+        fig_box.add_annotation(x="Performance Comparison", y=avg_static, text=f"<b>{avg_static:.2f}%</b>", showarrow=False, xshift=120, font=dict(color='blue', size=14))
 
+        # == [복구 포인트 4] S&P 500 라벨 (그래프 밖으로 충분히 이동) ==
+        # x=-0.08로 그래프 종이 좌측 밖으로 완전히 빼내어 Vanilla 박스와 겹침 방지
+        fig_box.add_hline(y=avg_spy, line_width=1.5, line_dash="dot", line_color="green", annotation_text=f"<b>S&P 500<br>{avg_spy:.2f}%</b>", annotation_position="top left", annotation_font=dict(color="green", size=14), annotation_x=-0.08)
+
+        # == [복구 포인트 5] 세로축 및 마진 복구 ==
         fig_box.update_layout(
-            title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=28, family="Arial Black")),
-            yaxis=dict(title="<b>Final Cumulative Return (%)</b>", tickfont=dict(size=16)),
-            xaxis=dict(tickfont=dict(size=20), showticklabels=True),
-            boxmode='group', boxgroupgap=0, # 막대기 사이의 간격을 0으로 설정하여 완전히 붙임
-            plot_bgcolor='white', height=500, margin=dict(t=120)
+            title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=26)),
+            yaxis=dict(title="<b>Final Cumulative Return (%)</b>", tickfont=dict(size=14)),
+            xaxis=dict(tickfont=dict(size=16), showticklabels=True),
+            boxmode='group', boxgroupgap=0, # 막대기 사이 간격을 완전히 붙임
+            plot_bgcolor='white', height=500, margin=dict(t=120, b=60, l=80, r=40)
         )
         fig_box.add_hline(y=0, line_width=2, line_color="black")
-        
-        # == [요청 반영] S&P 500 라벨 (맨 왼쪽 밖으로 충분히 이동) ==
-        # x=-0.12 (그래프 종이 밖 좌측)으로 이동시켜 붉은색 막대기와 절대 겹치지 않게 했습니다.
-        fig_box.add_hline(
-            y=avg_spy, line_width=1.5, line_dash="dot", line_color="green", 
-            annotation_text=f"<b>S&P 500<br>{avg_spy:.2f}%</b>", 
-            annotation_position="top left", 
-            annotation_font=dict(color="green", size=16, family="Arial Black"),
-            annotation_x=-0.12 # x축 좌표 강제 지정
-        )
         st.plotly_chart(fig_box, use_container_width=True)
         
     with col_hist_table:
+        # 소수점 2째자리까지만 고정
         styled_hist = history_df.set_index("Trial").style.map(style_dataframe).format("{:.2f}")
         st.dataframe(styled_hist, height=500, use_container_width=True)
     
