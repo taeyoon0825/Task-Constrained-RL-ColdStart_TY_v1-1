@@ -127,37 +127,55 @@ if len(st.session_state.trial_history) > 0:
     with col_box:
         fig_box = go.Figure()
         
-        # == [요청 반영] 박스 폭 조절 및 간격 밀착 ==
-        # width=0.25로 박스 폭을 더 줄여 전문가용 에러바와 일치시키고 간격을 최소화했습니다.
-        fig_box.add_trace(go.Box(y=history_df['Vanilla Final (%)'], name='<b>Vanilla RL</b>', line=dict(color='red', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.25))
-        fig_box.add_trace(go.Box(y=history_df['STATIC Final (%)'], name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=2), fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.25))
+        # == [수정됨] 두 막대기를 중앙(x="")으로 모으고 offsetgroup으로 밀착 ==
+        # width를 0.3으로 슬림하게 유지하면서 offsetgroup과 boxgroupgap=0을 사용하여 완전히 붙입니다.
+        fig_box.add_trace(go.Box(
+            x=["<b>Performance Comparison</b>"], y=history_df['Vanilla Final (%)'], 
+            name='<b>Vanilla RL</b>', line=dict(color='red', width=2), 
+            fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.3, offsetgroup='A'
+        ))
+        fig_box.add_trace(go.Box(
+            x=["<b>Performance Comparison</b>"], y=history_df['STATIC Final (%)'], 
+            name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=2), 
+            fillcolor='rgba(0,0,0,0)', boxmean=True, width=0.3, offsetgroup='B'
+        ))
         
-        # == [요청 반영] 안내 라벨창 (우측 상단 배치 및 줄바꿈) ==
-        # xref="paper", yref="paper"를 사용하여 x=0.98, y=1.02 (그래프 종이 기준 우측 상단)에 배치하고 줄바꿈을 적용했습니다.
-        fig_box.add_annotation(xref="paper", yref="paper", x=0.98, y=1.02, text="<b>[Box Line Guide]</b><br>점선(- - -) : 평균(Mean)<br>실선(──) : 중앙값(Median)", showarrow=False, font=dict(size=14, color="black", family="Arial Black"), bgcolor="rgba(255,255,255,0.9)", bordercolor="black", borderwidth=2, align="center")
+        # == [요청 반영] 안내 라벨창을 우측 상단으로 이동 및 줄바꿈 ==
+        # x=1.0 (우측 끝) 근처로 이동시켜 중앙의 막대기와 겹치지 않게 합니다.
+        fig_box.add_annotation(
+            xref="paper", yref="paper", x=1.0, y=1.15, 
+            text="<b>[Box Line Guide]</b><br>점선(- - -) : 평균(Mean)<br>실선(──) : 중앙값(Median)", 
+            showarrow=False, font=dict(size=14, color="black", family="Arial Black"), 
+            bgcolor="rgba(255,255,255,0.9)", bordercolor="black", borderwidth=2, align="center"
+        )
         
-        # == 수치 라벨 (박스 외부 날개형 배치) ==
-        # xshift를 박스 외부 날개형으로 유지하되, 박스 폭이 줄었으므로 간격을 조정했습니다.
-        # Mean(점선)-왼쪽, Median(실선)-오른쪽으로 날개형 배치합니다.
-        fig_box.add_annotation(x='<b>Vanilla RL</b>', y=avg_vanilla, text=f"<b>{avg_vanilla:.2f}%</b>", showarrow=False, xshift=-80, font=dict(color='red', size=14, family="Arial Black"))
-        fig_box.add_annotation(x='<b>Vanilla RL</b>', y=median_vanilla, text=f"<b>{median_vanilla:.2f}%</b>", showarrow=False, xshift=80, font=dict(color='red', size=14, family="Arial Black"))
-        fig_box.add_annotation(x='<b>STATIC RL (Ours)</b>', y=avg_static, text=f"<b>{avg_static:.2f}%</b>", showarrow=False, xshift=-80, font=dict(color='blue', size=14, family="Arial Black"))
-        fig_box.add_annotation(x='<b>STATIC RL (Ours)</b>', y=median_static, text=f"<b>{median_static:.2f}%</b>", showarrow=False, xshift=80, font=dict(color='blue', size=14, family="Arial Black"))
+        # == [요청 반영] 수치 라벨 (박스 외부: 점선-왼쪽, 실선-오른쪽) ==
+        # 중앙으로 모인 두 박스의 위치(offset)에 맞춰 xshift를 정밀 조정했습니다.
+        # Vanilla (좌측 박스)
+        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=avg_vanilla, text=f"<b>{avg_vanilla:.2f}%</b>", showarrow=False, xshift=-105, font=dict(color='red', size=14, family="Arial Black"))
+        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=median_vanilla, text=f"<b>{median_vanilla:.2f}%</b>", showarrow=False, xshift=-35, font=dict(color='red', size=14, family="Arial Black"))
+        # STATIC (우측 박스)
+        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=avg_static, text=f"<b>{avg_static:.2f}%</b>", showarrow=False, xshift=35, font=dict(color='blue', size=14, family="Arial Black"))
+        fig_box.add_annotation(x="<b>Performance Comparison</b>", y=median_static, text=f"<b>{median_static:.2f}%</b>", showarrow=False, xshift=105, font=dict(color='blue', size=14, family="Arial Black"))
 
-        # == 레이아웃 최적화 (박스 간격 축소) ==
-        # boxgap 및 boxgroupgap을 최소화하여 상자 사이의 공간을 줄입니다.
         fig_box.update_layout(
             title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=28, family="Arial Black")),
             yaxis=dict(title="<b>Final Cumulative Return (%)</b>", tickfont=dict(size=16)),
-            xaxis=dict(tickfont=dict(size=18)),
-            boxgap=0.05, boxgroupgap=0.02, # 박스 사이 간격 최소화
+            xaxis=dict(tickfont=dict(size=20), showticklabels=True),
+            boxmode='group', boxgroupgap=0, # 막대기 사이의 간격을 0으로 설정하여 완전히 붙임
             plot_bgcolor='white', height=500, margin=dict(t=120)
         )
         fig_box.add_hline(y=0, line_width=2, line_color="black")
         
-        # == [요청 반영] S&P 500 라벨 (맨 왼쪽 그래프 밖, 줄바꿈) ==
-        # xref="paper"를 사용하여 그래프 종이 기준 맨 왼쪽(x=-0.05)에 배치하여 붉은색 상자와 충분히 떨어뜨렸습니다.
-        fig_box.add_hline(y=avg_spy, line_width=1.5, line_dash="dot", line_color="green", annotation_text=f"<b>S&P 500<br>{avg_spy:.2f}%</b>", annotation_position="top left", annotation_font=dict(color="green", size=16, family="Arial Black"))
+        # == [요청 반영] S&P 500 라벨 (맨 왼쪽 밖으로 충분히 이동) ==
+        # x=-0.12 (그래프 종이 밖 좌측)으로 이동시켜 붉은색 막대기와 절대 겹치지 않게 했습니다.
+        fig_box.add_hline(
+            y=avg_spy, line_width=1.5, line_dash="dot", line_color="green", 
+            annotation_text=f"<b>S&P 500<br>{avg_spy:.2f}%</b>", 
+            annotation_position="top left", 
+            annotation_font=dict(color="green", size=16, family="Arial Black"),
+            annotation_x=-0.12 # x축 좌표 강제 지정
+        )
         st.plotly_chart(fig_box, use_container_width=True)
         
     with col_hist_table:
