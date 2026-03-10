@@ -28,12 +28,11 @@ max_episodes = len(env.data) - 20 - 1 if len(env.data) > 20 else 100
 episodes = st.sidebar.slider("Episodes (Trading Days)", 10, max_episodes, min(100, max_episodes))
 speed = st.sidebar.slider("Frame Speed (sec)", 0.0, 0.5, 0.0)
 
-# == [추가됨] 실험 재현성을 위한 랜덤 시드 설정 ==
+# == 실험 재현성을 위한 랜덤 시드 설정 ==
 base_seed = st.sidebar.number_input("Base Random Seed", value=2026, step=1, help="실험 재현성을 위한 기본 시드입니다. 각 Trial마다 이 값에 +1씩 더해집니다.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🧠 RL Hyperparameters (Logic: STATIC)")
-# 논문의 제약 조건 강화 학습을 제어하는 핵심 파라미터
 lr = st.sidebar.slider("Learning Rate (α)", 0.001, 0.5, 0.01, step=0.001)
 gamma = st.sidebar.slider("Discount Factor (γ)", 0.50, 0.99, 0.95, step=0.01)
 eps = st.sidebar.slider("Exploration (ε)", 0.0, 1.0, 0.1, step=0.05)
@@ -41,7 +40,6 @@ eps = st.sidebar.slider("Exploration (ε)", 0.0, 1.0, 0.1, step=0.05)
 if 'trial_history' not in st.session_state:
     st.session_state.trial_history = []
 
-# 변경된 파라미터 반영하여 에이전트 생성
 agent_raw = RecommendationAgent(env, use_constraints=False, lr=lr, gamma=gamma, eps=eps)
 agent_static = RecommendationAgent(env, use_constraints=True, lr=lr, gamma=gamma, eps=eps)
 
@@ -75,7 +73,6 @@ def style_df(val):
     return 'color: black; font-weight: bold; font-size: 16px;'
 
 if st.button("Run Evaluation"):
-    # == [추가됨] Trial 인덱스 기반 시드 고정 로직 ==
     trial_idx = len(st.session_state.trial_history)
     current_seed = base_seed + trial_idx
     np.random.seed(current_seed)
@@ -85,8 +82,6 @@ if st.button("Run Evaluation"):
     log_data = []
 
     for i in range(20, 20 + episodes):
-        # (주의) 만약 agent.py를 4개의 값을 반환하도록 수정하셨다면 여기서 언패킹 에러가 날 수 있습니다.
-        # 기존 3개 반환 구조(ticker, is_valid, reward)에 맞춘 코드입니다.
         ticker_u, _, r_u = agent_raw.select_action(current_step=i)
         ticker_s, _, r_s = agent_static.select_action(current_step=i)
         
@@ -109,7 +104,6 @@ if st.button("Run Evaluation"):
         m_b.metric(label="S&P 500 Index (SPY)", value=f"{h_b[-1]:.2f}%", delta=f"{r_b:.2f}%")
         time.sleep(speed)
 
-    # == [추가됨] 기록 데이터에 사용된 Seed 추가 ==
     st.session_state.trial_history.append({
         "Trial": trial_idx + 1, 
         "Seed": current_seed, 
@@ -126,47 +120,74 @@ if st.button("Run Evaluation"):
         with col_bar:
             st.plotly_chart(px.bar(pd.DataFrame(log_data)['STATIC Pick (Ours)'].value_counts().reset_index(), x='STATIC Pick (Ours)', y='count', title="<b>Safe-Asset Selection Frequency</b>", color='count', color_continuous_scale='Blues').update_layout(plot_bgcolor='white', height=350), use_container_width=True)
 
-# == 📊 하단: 통계 분석 박스 플롯 (최종 가독성 튜닝) ==
+# == 📊 하단: 통계 분석 고도화 (누적 그래프 및 박스 플롯) ==
 if len(st.session_state.trial_history) > 0:
     st.markdown("---")
     st.markdown("### Trial History: Statistical Analysis (Alpha Performance)")
     df_h = pd.DataFrame(st.session_state.trial_history)
-    avg_s, med_s = df_h['STATIC Final (%)'].mean(), df_h['STATIC Final (%)'].median()
-    avg_v, med_v = df_h['Vanilla Final (%)'].mean(), df_h['Vanilla Final (%)'].median()
+    
+    # 통계량 계산 (표준편차는 데이터가 2개 이상일 때만 계산)
+    v_mean, v_max, v_min = df_h['Vanilla Final (%)'].mean(), df_h['Vanilla Final (%)'].max(), df_h['Vanilla Final (%)'].min()
+    s_mean, s_max, s_min = df_h['STATIC Final (%)'].mean(), df_h['STATIC Final (%)'].max(), df_h['STATIC Final (%)'].min()
+    v_std = df_h['Vanilla Final (%)'].std() if len(df_h) > 1 else 0.0
+    s_std = df_h['STATIC Final (%)'].std() if len(df_h) > 1 else 0.0
     avg_spy = df_h['SPY Final (%)'].mean()
     
-    st.success(f"시장 평균 대비 **Alpha**: STATIC **{avg_s - avg_spy:.2f}%p** | Vanilla **{avg_v - avg_spy:.2f}%p**")
+    st.success(f"시장 평균 대비 **Alpha 기대치(Expected Value)**: STATIC **{s_mean - avg_spy:.2f}%p** | Vanilla **{v_mean - avg_spy:.2f}%p**")
 
+    # == 회차별 누적 성과 추이 그래프 ==
+    fig_trend = go.Figure()
+    
+    # 산점도 및 꺾은선 (Trial 추이)
+    fig_trend.add_trace(go.Scatter(x=df_h['Trial'], y=df_h['Vanilla Final (%)'], mode='lines+markers', name='<b>Vanilla Return</b>', line=dict(color='red', width=2), marker=dict(size=8)))
+    fig_trend.add_trace(go.Scatter(x=df_h['Trial'], y=df_h['STATIC Final (%)'], mode='lines+markers', name='<b>STATIC Return (Ours)</b>', line=dict(color='blue', width=2), marker=dict(size=8)))
+    
+    # 통계적 기준선 (H-lines)
+    # Vanilla 선들
+    fig_trend.add_hline(y=v_mean, line_dash="solid", line_color="red", opacity=0.4, annotation_text=f"Vanilla Mean", annotation_position="top right")
+    fig_trend.add_hline(y=v_max, line_dash="dot", line_color="red", opacity=0.3, annotation_text=f"Vanilla Max", annotation_position="top right")
+    fig_trend.add_hline(y=v_min, line_dash="dot", line_color="red", opacity=0.3, annotation_text=f"Vanilla Min", annotation_position="bottom right")
+    # STATIC 선들
+    fig_trend.add_hline(y=s_mean, line_dash="solid", line_color="blue", opacity=0.4, annotation_text=f"STATIC Mean", annotation_position="top left")
+    fig_trend.add_hline(y=s_max, line_dash="dot", line_color="blue", opacity=0.3, annotation_text=f"STATIC Max", annotation_position="top left")
+    fig_trend.add_hline(y=s_min, line_dash="dot", line_color="blue", opacity=0.3, annotation_text=f"STATIC Min", annotation_position="bottom left")
+
+    fig_trend.update_layout(
+        title=dict(text="<b>Trial-by-Trial Return Progression & Stability</b>", font=dict(size=24, family="Arial Black")),
+        xaxis=dict(title="<b>Trial Number</b>", tickmode='linear', dtick=1),
+        yaxis=dict(title="<b>Final Return (%)</b>"),
+        plot_bgcolor='white', height=400, margin=dict(t=60, b=40, l=40, r=40)
+    )
+    fig_trend.add_hline(y=0, line_width=2, line_color="black")
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+    # == 하단 2단 레이아웃 (박스 플롯 & 통계 테이블) ==
     col_box, col_tbl_h = st.columns([2, 1])
     with col_box:
         fig_box = go.Figure()
         
-        # 박스 위치: Vanilla=1.0, STATIC=2.25 (간격 절반으로 축소)
-        # Vanilla 좌측경계=0.75, STATIC 우측경계=2.5, 두 박스 사이 gap=[1.25, 2.0]=0.75
+        # 박스 형태 및 밀착 배치
         fig_box.add_trace(go.Box(y=df_h['Vanilla Final (%)'], x0=1.0, name='<b>Vanilla RL</b>', line=dict(color='red', width=3), fillcolor='rgba(255,0,0,0.05)', boxmean=True, width=0.5))
         fig_box.add_trace(go.Box(y=df_h['STATIC Final (%)'], x0=2.25, name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=3), fillcolor='rgba(0,0,255,0.05)', boxmean=True, width=0.5))
 
-        # == 수치 라벨: 박스 좌/우 경계선에 바짝 밀착 (xshift=±4) ==
-        # Vanilla 좌측경계 x=0.75에 우측정렬, STATIC 우측경계 x=2.5에 좌측정렬
-        fig_box.add_annotation(x=0.75, y=avg_v, text=f"<b>Mean: {avg_v:.2f}%</b>", showarrow=False, xshift=-4, yshift=8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
+        med_v, med_s = df_h['Vanilla Final (%)'].median(), df_h['STATIC Final (%)'].median()
+
+        # 수치 라벨 밀착 배치
+        fig_box.add_annotation(x=0.75, y=v_mean, text=f"<b>Mean: {v_mean:.2f}%</b>", showarrow=False, xshift=-4, yshift=8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
         fig_box.add_annotation(x=0.75, y=med_v, text=f"<b>Median: {med_v:.2f}%</b>", showarrow=False, xshift=-4, yshift=-8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
         fig_box.add_annotation(x=2.5, y=med_s, text=f"<b>Median: {med_s:.2f}%</b>", showarrow=False, xshift=4, yshift=8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
-        fig_box.add_annotation(x=2.5, y=avg_s, text=f"<b>Mean: {avg_s:.2f}%</b>", showarrow=False, xshift=4, yshift=-8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=2.5, y=s_mean, text=f"<b>Mean: {s_mean:.2f}%</b>", showarrow=False, xshift=4, yshift=-8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
 
-        # == S&P 500: 두 박스 사이 중앙(x=1.625)에 줄바꿈으로 배치 ==
         fig_box.add_hline(y=avg_spy, line_width=2.5, line_dash="dot", line_color="green")
         fig_box.add_annotation(x=1.625, xref="x", y=avg_spy, text=f"<b>S&P 500 (SPY)<br>{avg_spy:.2f}%</b>", showarrow=False, yshift=18, xanchor='center', align='center', font=dict(color="green", size=13, family="Arial Black"), bgcolor="rgba(0,0,0,0)")
 
-        # == 축 스타일 굵게 및 크게 조정 ==
         fig_box.update_layout(
             title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=26, family="Arial Black")),
             yaxis=dict(title="<b>Final Return (%)</b>", titlefont=dict(size=22, family="Arial Black"), tickfont=dict(size=18, family="Arial Black")),
             xaxis=dict(
                 title="<b>Performance Metrics</b>", titlefont=dict(size=22, family="Arial Black"),
-                tickmode='array', tickvals=[1.0, 2.25],
-                ticktext=['<b>Vanilla RL</b>', '<b>STATIC RL (Ours)</b>'],
-                tickfont=dict(size=18, family="Arial Black"),
-                range=[0, 3.0]
+                tickmode='array', tickvals=[1.0, 2.25], ticktext=['<b>Vanilla RL</b>', '<b>STATIC RL (Ours)</b>'],
+                tickfont=dict(size=18, family="Arial Black"), range=[0, 3.0]
             ),
             plot_bgcolor='white', height=550, margin=dict(t=120, b=100, l=80, r=80)
         )
@@ -174,7 +195,18 @@ if len(st.session_state.trial_history) > 0:
         st.plotly_chart(fig_box, use_container_width=True)
     
     with col_tbl_h:
-        # == [수정됨] Seed 컬럼 추가로 인한 포맷팅 안전 처리 ==
-        st.dataframe(df_h.set_index("Trial").style.map(style_df).format({"Vanilla Final (%)": "{:.2f}", "STATIC Final (%)": "{:.2f}", "SPY Final (%)": "{:.2f}", "Seed": "{:.0f}"}), height=550, use_container_width=True)
-
-st.markdown("#### 차트 해석 가이드: 점선(- - -)은 평균값(Mean), 실선(—)은 중앙값(Median)입니다.")
+        # 테이블 상단 요약 통계량 명시
+        st.markdown(f"""
+        <div style='background-color: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #e0e0e0; margin-bottom: 10px;'>
+            <h4 style='margin-top:0px; color: black; font-weight: 900;'>📊 통계 요약 (Expected & Risk)</h4>
+            <ul style='font-size: 15px; margin-bottom: 0px;'>
+                <li><b style='color:red;'>Vanilla 평균(기대치):</b> {v_mean:.2f}% (σ={v_std:.2f}%)</li>
+                <li><b style='color:red;'>Vanilla 범위:</b> {v_min:.2f}% ~ {v_max:.2f}%</li>
+                <hr style='margin: 8px 0;'>
+                <li><b style='color:blue;'>STATIC 평균(기대치):</b> {s_mean:.2f}% (σ={s_std:.2f}%)</li>
+                <li><b style='color:blue;'>STATIC 범위:</b> {s_min:.2f}% ~ {s_max:.2f}%</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.dataframe(df_h.set_index("Trial").style.map(style_df).format({"Vanilla Final (%)": "{:.2f}", "STATIC Final (%)": "{:.2f}", "SPY Final (%)": "{:.2f}", "Seed": "{:.0f}"}), height=320, use_container_width=True)
