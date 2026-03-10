@@ -1,6 +1,6 @@
 # Test-Constrained-RL-ColdStart
 
-## KDT Team Study : 팀 Chainers
+## KDT Team Study : 팀 Chainers 🫡
 
 S&P 500 대표 종목을 대상으로 제약 조건 강화학습(Constrained Reinforcement Learning)을 적용한 포트폴리오 관리 시뮬레이션 시스템입니다. 논문 "Vectorizing the Trie"에서 제안된 STATIC 프레임워크의 제약 디코딩(Constrained Decoding) 개념을 주식 시장에 이식하여, 금융 시장의 불확실성 속에서 리스크를 억제하고 안정적인 수익률을 도출하도록 설계되었습니다.
 
