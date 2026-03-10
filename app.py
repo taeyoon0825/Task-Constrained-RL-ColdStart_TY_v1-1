@@ -141,26 +141,32 @@ if len(st.session_state.trial_history) > 0:
     with col_box:
         fig_box = go.Figure()
         
-        # 박스 형태 및 밀착 배치
-        fig_box.add_trace(go.Box(y=df_h['Vanilla Final (%)'], name='<b>Vanilla RL</b>', line=dict(color='red', width=3), fillcolor='rgba(255,0,0,0.05)', boxmean=True, width=0.35, offsetgroup='1'))
-        fig_box.add_trace(go.Box(y=df_h['STATIC Final (%)'], name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=3), fillcolor='rgba(0,0,255,0.05)', boxmean=True, width=0.35, offsetgroup='2'))
-        
-        # == 수치 라벨 박스 "바깥쪽" 배치 ==
-        fig_box.add_annotation(x='<b>Vanilla RL</b>', y=avg_v, text=f"<b>Mean: {avg_v:.2f}%</b>", showarrow=False, xshift=-125, yshift=8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
-        fig_box.add_annotation(x='<b>Vanilla RL</b>', y=med_v, text=f"<b>Median: {med_v:.2f}%</b>", showarrow=False, xshift=-125, yshift=-8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
-        fig_box.add_annotation(x='<b>STATIC RL (Ours)</b>', y=med_s, text=f"<b>Median: {med_s:.2f}%</b>", showarrow=False, xshift=125, yshift=8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
-        fig_box.add_annotation(x='<b>STATIC RL (Ours)</b>', y=avg_s, text=f"<b>Mean: {avg_s:.2f}%</b>", showarrow=False, xshift=125, yshift=-8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
+        # 박스 형태 - 숫자형 x축 위치로 간격 정밀 제어 (Vanilla=1, STATIC=3)
+        fig_box.add_trace(go.Box(y=df_h['Vanilla Final (%)'], x0=1, name='<b>Vanilla RL</b>', line=dict(color='red', width=3), fillcolor='rgba(255,0,0,0.05)', boxmean=True, width=0.5))
+        fig_box.add_trace(go.Box(y=df_h['STATIC Final (%)'], x0=3, name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=3), fillcolor='rgba(0,0,255,0.05)', boxmean=True, width=0.5))
 
-        # == S&P 500 중앙 배치 ==
+        # == 수치 라벨: xshift를 절반(±60)으로 줄여 박스 바깥 세로선에 밀착 ==
+        fig_box.add_annotation(x=1, y=avg_v, text=f"<b>Mean: {avg_v:.2f}%</b>", showarrow=False, xshift=-60, yshift=8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=1, y=med_v, text=f"<b>Median: {med_v:.2f}%</b>", showarrow=False, xshift=-60, yshift=-8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=3, y=med_s, text=f"<b>Median: {med_s:.2f}%</b>", showarrow=False, xshift=60, yshift=8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=3, y=avg_s, text=f"<b>Mean: {avg_s:.2f}%</b>", showarrow=False, xshift=60, yshift=-8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
+
+        # == S&P 500: 두 박스 사이 중앙(x=2)에 배치 - 박스와 겹침 없음 ==
         fig_box.add_hline(y=avg_spy, line_width=2.5, line_dash="dot", line_color="green")
-        fig_box.add_annotation(x=0.5, xref="paper", y=avg_spy, text=f"<b>S&P 500: {avg_spy:.2f}%</b>", showarrow=False, yshift=15, font=dict(color="green", size=15, family="Arial Black"), bgcolor="white")
+        fig_box.add_annotation(x=2, xref="x", y=avg_spy, text=f"<b>S&P 500: {avg_spy:.2f}%</b>", showarrow=False, yshift=15, xanchor='center', font=dict(color="green", size=15, family="Arial Black"), bgcolor="white")
 
         # == 축 스타일 굵게 및 크게 조정 ==
         fig_box.update_layout(
             title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=26, family="Arial Black")),
             yaxis=dict(title="<b>Final Return (%)</b>", titlefont=dict(size=22, family="Arial Black"), tickfont=dict(size=18, family="Arial Black")),
-            xaxis=dict(title="<b>Performance Metrics</b>", titlefont=dict(size=22, family="Arial Black"), tickfont=dict(size=18, family="Arial Black")),
-            boxmode='group', boxgroupgap=0.05, plot_bgcolor='white', height=550, margin=dict(t=120, b=100, l=120, r=120)
+            xaxis=dict(
+                title="<b>Performance Metrics</b>", titlefont=dict(size=22, family="Arial Black"),
+                tickmode='array', tickvals=[1, 3],
+                ticktext=['<b>Vanilla RL</b>', '<b>STATIC RL (Ours)</b>'],
+                tickfont=dict(size=18, family="Arial Black"),
+                range=[0, 4]
+            ),
+            plot_bgcolor='white', height=550, margin=dict(t=120, b=100, l=80, r=80)
         )
         fig_box.add_hline(y=0, line_width=2, line_color="black")
         st.plotly_chart(fig_box, use_container_width=True)
