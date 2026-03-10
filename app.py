@@ -12,7 +12,7 @@ st.set_page_config(page_title="Test-Constrained-RL", layout="wide")
 # == [UI 개선] CSS: 지표 카드 및 테이블 가독성 강화 ==
 st.markdown("""
 <style>
-div[data-testid="column"]:nth-of-type(1) [data-testid="stMetricLabel"] * { color: red !important; font-weight: 900 !important; font-size: 1.4rem !important; }
+div[data-testid="column"]:nth-of-type(1) [data-testid="stMetricLabel"] * { color: #e05050 !important; font-weight: 900 !important; font-size: 1.4rem !important; }
 div[data-testid="column"]:nth-of-type(2) [data-testid="stMetricLabel"] * { color: #4a90d9 !important; font-weight: 900 !important; font-size: 1.4rem !important; }
 div[data-testid="column"]:nth-of-type(3) [data-testid="stMetricLabel"] * { color: #2ea84a !important; font-weight: 900 !important; font-size: 1.4rem !important; }
 div[data-testid="stMetricValue"] { font-weight: 900 !important; font-size: 2.2rem !important; }
@@ -50,8 +50,8 @@ agent_static = RecommendationAgent(env, use_constraints=True, lr=lr, gamma=gamma
 
 # == 📈 메인 수익률 비교 차트 ==
 fig_main = go.Figure()
-fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>Vanilla RL</b>', line=dict(color='red', width=2), marker=dict(symbol='circle-open', size=6)))
-fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>RL with STATIC</b>', line=dict(color='blue', width=2), marker=dict(symbol='square-open', size=6)))
+fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>Vanilla RL</b>', line=dict(color='#e05050', width=2), marker=dict(symbol='circle-open', size=6)))
+fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>RL with STATIC</b>', line=dict(color='#4a90d9', width=2), marker=dict(symbol='square-open', size=6)))
 fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>S&P 500 (SPY)</b>', line=dict(color='green', width=2, dash='dot'), marker=dict(symbol='diamond-open', size=6)))
 
 fig_main.update_layout(
@@ -79,7 +79,7 @@ bar_view = col_bar.empty()
 def style_df(val):
     if isinstance(val, (int, float)):
         if val < 0:
-            return 'color: red; font-weight: bold; font-size: 16px;'
+            return 'color: #e05050; font-weight: bold; font-size: 16px;'
         return 'font-weight: bold; font-size: 16px;'
     return 'font-weight: bold; font-size: 16px;'
 
@@ -156,17 +156,17 @@ if len(st.session_state.trial_history) > 0:
     # == 회차별 누적 성과 추이 그래프 ==
     fig_trend = go.Figure()
     
-    fig_trend.add_trace(go.Scatter(x=df_h['Trial'], y=df_h['Vanilla Final (%)'], mode='lines+markers', name='<b>Vanilla Return</b>', line=dict(color='red', width=2), marker=dict(size=8)))
-    fig_trend.add_trace(go.Scatter(x=df_h['Trial'], y=df_h['STATIC Final (%)'], mode='lines+markers', name='<b>STATIC Return (Ours)</b>', line=dict(color='blue', width=2), marker=dict(size=8)))
-    
+    fig_trend.add_trace(go.Scatter(x=df_h['Trial'], y=df_h['Vanilla Final (%)'], mode='lines+markers', name='<b>Vanilla Return</b>', line=dict(color='#e05050', width=2), marker=dict(size=8)))
+    fig_trend.add_trace(go.Scatter(x=df_h['Trial'], y=df_h['STATIC Final (%)'], mode='lines+markers', name='<b>STATIC Return (Ours)</b>', line=dict(color='#4a90d9', width=2), marker=dict(size=8)))
+
     # Vanilla 선들
-    fig_trend.add_hline(y=v_mean, line_dash="solid", line_color="red", opacity=0.4, annotation_text=f"Vanilla Mean", annotation_position="top right")
-    fig_trend.add_hline(y=v_max, line_dash="dot", line_color="red", opacity=0.3, annotation_text=f"Vanilla Max", annotation_position="top right")
-    fig_trend.add_hline(y=v_min, line_dash="dot", line_color="red", opacity=0.3, annotation_text=f"Vanilla Min", annotation_position="bottom right")
+    fig_trend.add_hline(y=v_mean, line_dash="solid", line_color="#e05050", opacity=0.4, annotation_text=f"Vanilla Mean", annotation_position="top right")
+    fig_trend.add_hline(y=v_max, line_dash="dot", line_color="#e05050", opacity=0.3, annotation_text=f"Vanilla Max", annotation_position="top right")
+    fig_trend.add_hline(y=v_min, line_dash="dot", line_color="#e05050", opacity=0.3, annotation_text=f"Vanilla Min", annotation_position="bottom right")
     # STATIC 선들
-    fig_trend.add_hline(y=s_mean, line_dash="solid", line_color="blue", opacity=0.4, annotation_text=f"STATIC Mean", annotation_position="top left")
-    fig_trend.add_hline(y=s_max, line_dash="dot", line_color="blue", opacity=0.3, annotation_text=f"STATIC Max", annotation_position="top left")
-    fig_trend.add_hline(y=s_min, line_dash="dot", line_color="blue", opacity=0.3, annotation_text=f"STATIC Min", annotation_position="bottom left")
+    fig_trend.add_hline(y=s_mean, line_dash="solid", line_color="#4a90d9", opacity=0.4, annotation_text=f"STATIC Mean", annotation_position="top left")
+    fig_trend.add_hline(y=s_max, line_dash="dot", line_color="#4a90d9", opacity=0.3, annotation_text=f"STATIC Max", annotation_position="top left")
+    fig_trend.add_hline(y=s_min, line_dash="dot", line_color="#4a90d9", opacity=0.3, annotation_text=f"STATIC Min", annotation_position="bottom left")
 
     fig_trend.update_layout(
         title=dict(text="<b>Trial-by-Trial Return Progression & Stability</b>", font=dict(size=24, family="Arial Black")),
@@ -183,16 +183,16 @@ if len(st.session_state.trial_history) > 0:
         fig_box = go.Figure()
         
         # 박스 형태 및 밀착 배치
-        fig_box.add_trace(go.Box(y=df_h['Vanilla Final (%)'], x0=1.0, name='<b>Vanilla RL</b>', line=dict(color='red', width=3), fillcolor='rgba(255,0,0,0.05)', boxmean=True, width=0.5))
-        fig_box.add_trace(go.Box(y=df_h['STATIC Final (%)'], x0=2.25, name='<b>STATIC RL (Ours)</b>', line=dict(color='blue', width=3), fillcolor='rgba(0,0,255,0.05)', boxmean=True, width=0.5))
+        fig_box.add_trace(go.Box(y=df_h['Vanilla Final (%)'], x0=1.0, name='<b>Vanilla RL</b>', line=dict(color='#e05050', width=3), fillcolor='rgba(224,80,80,0.05)', boxmean=True, width=0.5))
+        fig_box.add_trace(go.Box(y=df_h['STATIC Final (%)'], x0=2.25, name='<b>STATIC RL (Ours)</b>', line=dict(color='#4a90d9', width=3), fillcolor='rgba(74,144,217,0.05)', boxmean=True, width=0.5))
 
         med_v, med_s = df_h['Vanilla Final (%)'].median(), df_h['STATIC Final (%)'].median()
 
         # 수치 라벨 밀착 배치
-        fig_box.add_annotation(x=0.75, y=v_mean, text=f"<b>Mean: {v_mean:.2f}%</b>", showarrow=False, xshift=-4, yshift=8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
-        fig_box.add_annotation(x=0.75, y=med_v, text=f"<b>Median: {med_v:.2f}%</b>", showarrow=False, xshift=-4, yshift=-8, xanchor='right', font=dict(color='red', size=13, family="Arial Black"))
-        fig_box.add_annotation(x=2.5, y=med_s, text=f"<b>Median: {med_s:.2f}%</b>", showarrow=False, xshift=4, yshift=8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
-        fig_box.add_annotation(x=2.5, y=s_mean, text=f"<b>Mean: {s_mean:.2f}%</b>", showarrow=False, xshift=4, yshift=-8, xanchor='left', font=dict(color='blue', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=0.75, y=v_mean, text=f"<b>Mean: {v_mean:.2f}%</b>", showarrow=False, xshift=-4, yshift=8, xanchor='right', font=dict(color='#e05050', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=0.75, y=med_v, text=f"<b>Median: {med_v:.2f}%</b>", showarrow=False, xshift=-4, yshift=-8, xanchor='right', font=dict(color='#e05050', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=2.5, y=med_s, text=f"<b>Median: {med_s:.2f}%</b>", showarrow=False, xshift=4, yshift=8, xanchor='left', font=dict(color='#4a90d9', size=13, family="Arial Black"))
+        fig_box.add_annotation(x=2.5, y=s_mean, text=f"<b>Mean: {s_mean:.2f}%</b>", showarrow=False, xshift=4, yshift=-8, xanchor='left', font=dict(color='#4a90d9', size=13, family="Arial Black"))
 
         fig_box.add_hline(y=avg_spy, line_width=2.5, line_dash="dot", line_color="green")
         fig_box.add_annotation(x=1.625, xref="x", y=avg_spy, text=f"<b>S&P 500 (SPY)<br>{avg_spy:.2f}%</b>", showarrow=False, yshift=18, xanchor='center', align='center', font=dict(color="green", size=13, family="Arial Black"), bgcolor="rgba(0,0,0,0)")
