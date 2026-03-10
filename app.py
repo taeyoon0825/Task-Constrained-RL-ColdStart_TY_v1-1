@@ -155,7 +155,7 @@ if len(st.session_state.trial_history) > 0:
 
         # == S&P 500: 두 박스 사이 중앙(x=1.625)에 줄바꿈으로 배치 ==
         fig_box.add_hline(y=avg_spy, line_width=2.5, line_dash="dot", line_color="green")
-        fig_box.add_annotation(x=1.625, xref="x", y=avg_spy, text=f"<b>S&P 500 (SPY)<br>{avg_spy:.2f}%</b>", showarrow=False, yshift=18, xanchor='center', align='center', font=dict(color="green", size=13, family="Arial Black"), bgcolor="white")
+        fig_box.add_annotation(x=1.625, xref="x", y=avg_spy, text=f"<b>S&P 500 (SPY)<br>{avg_spy:.2f}%</b>", showarrow=False, yshift=18, xanchor='center', align='center', font=dict(color="green", size=13, family="Arial Black"), bgcolor="rgba(0,0,0,0)")
 
         # == 축 스타일 굵게 및 크게 조정 ==
         fig_box.update_layout(
