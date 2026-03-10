@@ -19,7 +19,7 @@ div[data-testid="stMetricValue"] { font-weight: 900 !important; font-size: 2.2re
 thead tr th { font-size: 18px !important; color: var(--text-color) !important; font-weight: 900 !important; }
 </style>
 """, unsafe_allow_html=True)
-st.markdown("## Test-Constrained-RL-ColdStart: S&P 500 Performance Comparison Dashboard")
+st.markdown("## Test-Constrained-RL-ColdStart: S&P 500 Performance")
 
 # == 🛠 사이드바: 테스트 및 강화학습 파라미터 제어 ==
 st.sidebar.markdown("### System Parameters")
