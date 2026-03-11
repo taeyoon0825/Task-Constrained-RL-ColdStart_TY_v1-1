@@ -4,12 +4,36 @@ import yfinance as yf
 import streamlit as st
 import config
 
-class SP500Environment:
-    """ S&P 500 대표 종목 및 벤치마크(SPY) 데이터를 관리하는 환경 """
+class KOSPIEnvironment:
+    """ KOSPI 주요 종목 및 벤치마크(KOSPI 지수 또는 ETF) 데이터를 관리하는 환경 """
     def __init__(self):
-        self.tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "XOM", "LLY", "V",
-                        "JPM", "UNH", "WMT", "MA", "JNJ", "PG", "HD", "ORCL", "CVX", "MRK"]
-        self.benchmark = "SPY"
+        # KOSPI 대형주 예시 티커 목록 (yfinance 형식)
+        self.tickers = [
+            "005930.KS",  # 삼성전자
+            "000660.KS",  # SK하이닉스
+            "035420.KS",  # NAVER
+            "051910.KS",  # LG화학
+            "207940.KS",  # 삼성바이오로직스
+            "005380.KS",  # 현대차
+            "000270.KS",  # 기아
+            "068270.KS",  # 셀트리온
+            "035720.KS",  # 카카오
+            "105560.KS",  # KB금융
+            "055550.KS",  # 신한지주
+            "028260.KS",  # 삼성물산
+            "012330.KS",  # 현대모비스
+            "096770.KS",  # SK이노베이션
+            "034730.KS",  # SK
+            "251270.KS",  # 넷마블
+            "066570.KS",  # LG전자
+            "003550.KS",  # LG
+            "316140.KS",  # 우리금융지주
+            "003490.KS",  # 대한항공
+        ]
+
+        # 코스피 지수 자체를 벤치마크로 사용 (KOSPI 지수: ^KS11)
+        # 필요에 따라 KODEX200 ETF(069500.KS) 등으로 교체 가능
+        self.benchmark = "^KS11"
         self.all_symbols = self.tickers + [self.benchmark]
         
         self.data, self.tickers = self._download_data()
@@ -17,7 +41,7 @@ class SP500Environment:
 
     @st.cache_data(ttl=3600)
     def _download_data(_self):
-        # 벤치마크를 포함하여 데이터 다운로드 (5년, 약 1260 거래일)
+        # 벤치마크를 포함하여 KOSPI 관련 데이터 다운로드 (5년, 일봉)
         data = yf.download(_self.all_symbols, period="5y", interval="1d")['Close']
         data = data.ffill().bfill().dropna(axis=1)
         # _self를 직접 변형하지 않고 tickers를 반환값으로 전달 (mutation 경고 방지)

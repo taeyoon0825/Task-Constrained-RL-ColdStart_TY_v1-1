@@ -4,7 +4,7 @@ import numpy as np
 import time
 import plotly.graph_objects as go
 import plotly.express as px
-from agent import SP500Environment, RecommendationAgent
+from agent import KOSPIEnvironment, RecommendationAgent
 
 # st.set_page_config은 반드시 첫 번째 Streamlit 명령이어야 함
 st.set_page_config(page_title="Test-Constrained-RL", layout="wide")
@@ -19,11 +19,11 @@ div[data-testid="stMetricValue"] { font-weight: 900 !important; font-size: 2.2re
 thead tr th { font-size: 18px !important; color: var(--text-color) !important; font-weight: 900 !important; }
 </style>
 """, unsafe_allow_html=True)
-st.markdown("## Test-Constrained-RL-ColdStart: S&P 500 Performance")
+st.markdown("## Test-Constrained-RL-ColdStart: KOSPI Performance")
 
 # == 🛠 사이드바: 테스트 및 강화학습 파라미터 제어 ==
 st.sidebar.markdown("### System Parameters")
-env = SP500Environment()
+env = KOSPIEnvironment()
 max_episodes = len(env.data) - 20 - 1 if len(env.data) > 20 else 100
 episodes = st.sidebar.slider("Episodes (Trading Days)", 10, max_episodes, min(100, max_episodes))
 # [수정됨] Frame Speed 기본값 0.03, step 0.01 반영
@@ -52,10 +52,10 @@ agent_static = RecommendationAgent(env, use_constraints=True, lr=lr, gamma=gamma
 fig_main = go.Figure()
 fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>Vanilla RL</b>', line=dict(color='#e05050', width=2), marker=dict(symbol='circle-open', size=6)))
 fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>RL with STATIC</b>', line=dict(color='#4a90d9', width=2), marker=dict(symbol='square-open', size=6)))
-fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>S&P 500 (SPY)</b>', line=dict(color='green', width=2, dash='dot'), marker=dict(symbol='diamond-open', size=6)))
+fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>KOSPI Index</b>', line=dict(color='green', width=2, dash='dot'), marker=dict(symbol='diamond-open', size=6)))
 
 fig_main.update_layout(
-    title=dict(text="<b>Cumulative Return Comparison (S&P 500)</b>", font=dict(size=28)),
+    title=dict(text="<b>Cumulative Return Comparison (KOSPI)</b>", font=dict(size=28)),
     xaxis=dict(title="<b>Trading Days</b>", titlefont=dict(size=18), showgrid=True),
     yaxis=dict(title="<b>Total Cumulative Return (%)</b>", titlefont=dict(size=18), showgrid=True),
     legend=dict(font=dict(size=16), x=0.01, y=0.99, bgcolor='rgba(128,128,128,0.15)', bordercolor='rgba(128,128,128,0.3)', borderwidth=1),
@@ -93,14 +93,17 @@ if st.button("Run Evaluation"):
         h_u, h_s, h_b, steps = [0], [0], [0], [0]
         log_data = []
 
+        benchmark_col = env.benchmark
+
         for i in range(20, 20 + episodes):
             ticker_u, _, r_u = agent_raw.select_action(current_step=i)
             ticker_s, _, r_s = agent_static.select_action(current_step=i)
             
-            if 'SPY' in env.data.columns:
-                sc, sn = float(env.data['SPY'].iloc[i]), float(env.data['SPY'].iloc[i+1])
+            if benchmark_col in env.data.columns:
+                sc, sn = float(env.data[benchmark_col].iloc[i]), float(env.data[benchmark_col].iloc[i+1])
                 r_b = ((sn - sc) / sc) * 100 if sc > 0 else 0.0
-            else: r_b = 0.0
+            else:
+                r_b = 0.0
                 
             h_u.append(h_u[-1] + r_u); h_s.append(h_s[-1] + r_s); h_b.append(h_b[-1] + r_b)
             current_day = i - 19; steps.append(current_day) 
@@ -113,7 +116,7 @@ if st.button("Run Evaluation"):
             
             m_u.metric(label="Unconstrained Return", value=f"{h_u[-1]:.2f}%", delta=f"{r_u:.2f}%")
             m_s.metric(label=f"STATIC Return - Bought: {ticker_s}", value=f"{h_s[-1]:.2f}%", delta=f"{r_s:.2f}%")
-            m_b.metric(label="S&P 500 Index (SPY)", value=f"{h_b[-1]:.2f}%", delta=f"{r_b:.2f}%")
+            m_b.metric(label="KOSPI Index", value=f"{h_b[-1]:.2f}%", delta=f"{r_b:.2f}%")
             
             if speed > 0:
                 time.sleep(speed)
@@ -123,7 +126,7 @@ if st.button("Run Evaluation"):
             "Seed": current_seed, 
             "Vanilla Final (%)": h_u[-1], 
             "STATIC Final (%)": h_s[-1], 
-            "SPY Final (%)": h_b[-1]
+            "KOSPI Final (%)": h_b[-1]
         })
 
         analysis_header.markdown("#### Agent Decision Analysis")
@@ -149,9 +152,9 @@ if len(st.session_state.trial_history) > 0:
     s_mean, s_max, s_min = df_h['STATIC Final (%)'].mean(), df_h['STATIC Final (%)'].max(), df_h['STATIC Final (%)'].min()
     v_std = df_h['Vanilla Final (%)'].std() if len(df_h) > 1 else 0.0
     s_std = df_h['STATIC Final (%)'].std() if len(df_h) > 1 else 0.0
-    avg_spy = df_h['SPY Final (%)'].mean()
+    avg_kospi = df_h['KOSPI Final (%)'].mean()
     
-    st.success(f"시장 평균 대비 **Alpha 기대치(Expected Value)**: STATIC **{s_mean - avg_spy:.2f}%p** | Vanilla **{v_mean - avg_spy:.2f}%p**")
+    st.success(f"시장 평균 대비 **Alpha 기대치(Expected Value)**: STATIC **{s_mean - avg_kospi:.2f}%p** | Vanilla **{v_mean - avg_kospi:.2f}%p**")
 
     # == 회차별 누적 성과 추이 그래프 ==
     fig_trend = go.Figure()
@@ -193,9 +196,9 @@ if len(st.session_state.trial_history) > 0:
         fig_box.add_annotation(x=0.75, y=med_v, text=f"<b>Median: {med_v:.2f}%</b>", showarrow=False, xshift=-4, yshift=-8, xanchor='right', font=dict(color='#e05050', size=13, family="Arial Black"))
         fig_box.add_annotation(x=2.5, y=med_s, text=f"<b>Median: {med_s:.2f}%</b>", showarrow=False, xshift=4, yshift=8, xanchor='left', font=dict(color='#4a90d9', size=13, family="Arial Black"))
         fig_box.add_annotation(x=2.5, y=s_mean, text=f"<b>Mean: {s_mean:.2f}%</b>", showarrow=False, xshift=4, yshift=-8, xanchor='left', font=dict(color='#4a90d9', size=13, family="Arial Black"))
-
-        fig_box.add_hline(y=avg_spy, line_width=2.5, line_dash="dot", line_color="green")
-        fig_box.add_annotation(x=1.625, xref="x", y=avg_spy, text=f"<b>S&P 500 (SPY)<br>{avg_spy:.2f}%</b>", showarrow=False, yshift=18, xanchor='center', align='center', font=dict(color="green", size=13, family="Arial Black"), bgcolor="rgba(0,0,0,0)")
+        
+        fig_box.add_hline(y=avg_kospi, line_width=2.5, line_dash="dot", line_color="green")
+        fig_box.add_annotation(x=1.625, xref="x", y=avg_kospi, text=f"<b>KOSPI Index<br>{avg_kospi:.2f}%</b>", showarrow=False, yshift=18, xanchor='center', align='center', font=dict(color="green", size=13, family="Arial Black"), bgcolor="rgba(0,0,0,0)")
 
         fig_box.update_layout(
             title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=26, family="Arial Black")),
@@ -225,4 +228,15 @@ if len(st.session_state.trial_history) > 0:
         </div>
         """, unsafe_allow_html=True)
         
-        st.dataframe(df_h.set_index("Trial").style.map(style_df).format({"Vanilla Final (%)": "{:.2f}", "STATIC Final (%)": "{:.2f}", "SPY Final (%)": "{:.2f}", "Seed": "{:.0f}"}), height=320, use_container_width=True)
+        st.dataframe(
+            df_h.set_index("Trial")
+                .style.map(style_df)
+                .format({
+                    "Vanilla Final (%)": "{:.2f}",
+                    "STATIC Final (%)": "{:.2f}",
+                    "KOSPI Final (%)": "{:.2f}",
+                    "Seed": "{:.0f}",
+                }),
+            height=320,
+            use_container_width=True,
+        )
