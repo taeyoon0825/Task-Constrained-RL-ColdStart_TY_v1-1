@@ -42,6 +42,18 @@ lr = st.sidebar.slider("Learning Rate (α)", 0.001, 0.5, 0.01, step=0.001)
 gamma = st.sidebar.slider("Discount Factor (γ)", 0.50, 0.99, 0.98, step=0.01)
 eps = st.sidebar.slider("Exploration (ε)", 0.0, 1.0, 0.1, step=0.05)
 
+# == 자동 파라미터 스윕 설정 ==
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Auto Hyperparameter Sweep")
+runs_per_config = st.sidebar.number_input(
+    "Runs per Config (Sweep)",
+    min_value=1,
+    value=5,
+    step=1,
+    help="각 파라미터 조합당 몇 번씩 시뮬레이션을 반복할지 설정합니다.",
+)
+start_sweep = st.sidebar.button("Run Auto Sweep (lr → γ → ε)")
+
 if 'trial_history' not in st.session_state:
     st.session_state.trial_history = []
 
@@ -56,15 +68,30 @@ fig_main.add_trace(go.Scatter(x=[0], y=[0], mode='lines+markers', name='<b>KOSPI
 
 fig_main.update_layout(
     title=dict(text="<b>Cumulative Return Comparison (KOSPI)</b>", font=dict(size=28)),
-    xaxis=dict(title="<b>Trading Days</b>", titlefont=dict(size=18), showgrid=True),
-    yaxis=dict(title="<b>Total Cumulative Return (%)</b>", titlefont=dict(size=18), showgrid=True),
-    legend=dict(font=dict(size=16), x=0.01, y=0.99, bgcolor='rgba(128,128,128,0.15)', bordercolor='rgba(128,128,128,0.3)', borderwidth=1),
-    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=550, margin=dict(t=80, b=80, l=80, r=40)
+    xaxis=dict(
+        title=dict(text="<b>Trading Days</b>", font=dict(size=18)),
+        showgrid=True
+    ),
+    yaxis=dict(
+        title=dict(text="<b>Total Cumulative Return (%)</b>", font=dict(size=18)),
+        showgrid=True
+    ),
+    legend=dict(
+        font=dict(size=16),
+        x=0.01,
+        y=0.99,
+        bgcolor='rgba(128,128,128,0.15)',
+        bordercolor='rgba(128,128,128,0.3)',
+        borderwidth=1
+    ),
+    plot_bgcolor='rgba(0,0,0,0)',
+    paper_bgcolor='rgba(0,0,0,0)',
+    height=550,
+    margin=dict(t=80, b=80, l=80, r=40)
 )
 fig_main.add_hline(y=0, line_width=2, line_color="rgba(150,150,150,0.8)")
 
 chart_view = st.empty()
-chart_view.plotly_chart(fig_main, use_container_width=True)
 
 col1, col2, col3 = st.columns(3)
 m_u, m_s, m_b = col1.empty(), col2.empty(), col3.empty()
@@ -82,6 +109,9 @@ def style_df(val):
             return 'color: #e05050; font-weight: bold; font-size: 16px;'
         return 'font-weight: bold; font-size: 16px;'
     return 'font-weight: bold; font-size: 16px;'
+
+if 'sweep_results' not in st.session_state:
+    st.session_state.sweep_results = None
 
 if st.button("Run Evaluation"):
     for run in range(auto_runs):
@@ -112,7 +142,6 @@ if st.button("Run Evaluation"):
             fig_main.data[0].x = steps; fig_main.data[0].y = h_u
             fig_main.data[1].x = steps; fig_main.data[1].y = h_s
             fig_main.data[2].x = steps; fig_main.data[2].y = h_b
-            chart_view.plotly_chart(fig_main, use_container_width=True)
             
             m_u.metric(label="Unconstrained Return", value=f"{h_u[-1]:.2f}%", delta=f"{r_u:.2f}%")
             m_s.metric(label=f"STATIC Return - Bought: {ticker_s}", value=f"{h_s[-1]:.2f}%", delta=f"{r_s:.2f}%")
@@ -120,6 +149,9 @@ if st.button("Run Evaluation"):
             
             if speed > 0:
                 time.sleep(speed)
+
+        # 에피소드 루프가 끝난 뒤 한 번만 메인 차트 렌더링
+        chart_view.plotly_chart(fig_main, use_container_width=True)
 
         st.session_state.trial_history.append({
             "Trial": trial_idx + 1, 
@@ -140,6 +172,138 @@ if st.button("Run Evaluation"):
         fig_bar = px.bar(df_log['STATIC Pick (Ours)'].value_counts().reset_index(), x='STATIC Pick (Ours)', y='count',
                          title="<b>Safe-Asset Selection Frequency</b>", color='count', color_continuous_scale='Blues')
         bar_view.plotly_chart(fig_bar.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=350), use_container_width=True)
+
+# == 📊 자동 파라미터 스윕 실행 ==
+if start_sweep:
+    st.markdown("---")
+    st.markdown("### Auto Hyperparameter Sweep Results")
+
+    # 1단계: lr 스윕용 후보
+    lr_candidates = [0.005, 0.01, 0.02, 0.05]
+    # 2단계: gamma 스윕용 후보
+    gamma_candidates = [0.90, 0.95, 0.98, 0.99]
+    # 3단계: eps 스윕용 후보
+    eps_candidates = [0.0, 0.05, 0.1, 0.2]
+
+    # Episodes는 설명한 대로 100으로 고정 (데이터가 허용하는 범위 내에서)
+    episodes_sweep = min(100, max_episodes)
+
+    results = []
+
+    # == (1) lr 스윕: gamma, eps는 현재 슬라이더 값 사용 ==
+    for lr_val in lr_candidates:
+        static_returns = []
+        for run_idx in range(runs_per_config):
+            # 재현성 있는 시드를 위해 base_seed 활용
+            np.random.seed(base_seed + run_idx)
+            agent_u = RecommendationAgent(env, use_constraints=False, lr=lr_val, gamma=gamma, eps=eps)
+            agent_s = RecommendationAgent(env, use_constraints=True, lr=lr_val, gamma=gamma, eps=eps)
+
+            h_s = 0.0
+            benchmark_col = env.benchmark
+
+            for i in range(20, 20 + episodes_sweep):
+                _, _, r_u = agent_u.select_action(current_step=i)
+                _, _, r_s = agent_s.select_action(current_step=i)
+
+                # STATIC 성과만 누적 (lr 비교 목적)
+                h_s += r_s
+
+            static_returns.append(h_s)
+
+        results.append({
+            "Phase": "lr",
+            "lr": lr_val,
+            "gamma": gamma,
+            "eps": eps,
+            "STATIC Mean (%)": np.mean(static_returns),
+            "STATIC Median (%)": float(np.median(static_returns)),
+            "STATIC Std (%)": float(np.std(static_returns)) if len(static_returns) > 1 else 0.0,
+        })
+
+    # lr 스윕에서 가장 좋은 lr 선택
+    df_lr = pd.DataFrame([r for r in results if r["Phase"] == "lr"])
+    best_lr = df_lr.sort_values("STATIC Mean (%)", ascending=False).iloc[0]["lr"]
+
+    # == (2) gamma 스윕: best_lr 고정, eps는 현재 슬라이더 값 사용 ==
+    for gamma_val in gamma_candidates:
+        static_returns = []
+        for run_idx in range(runs_per_config):
+            np.random.seed(base_seed + 100 + run_idx)
+            agent_u = RecommendationAgent(env, use_constraints=False, lr=best_lr, gamma=gamma_val, eps=eps)
+            agent_s = RecommendationAgent(env, use_constraints=True, lr=best_lr, gamma=gamma_val, eps=eps)
+
+            h_s = 0.0
+
+            for i in range(20, 20 + episodes_sweep):
+                _, _, r_u = agent_u.select_action(current_step=i)
+                _, _, r_s = agent_s.select_action(current_step=i)
+                h_s += r_s
+
+            static_returns.append(h_s)
+
+        results.append({
+            "Phase": "gamma",
+            "lr": best_lr,
+            "gamma": gamma_val,
+            "eps": eps,
+            "STATIC Mean (%)": np.mean(static_returns),
+            "STATIC Median (%)": float(np.median(static_returns)),
+            "STATIC Std (%)": float(np.std(static_returns)) if len(static_returns) > 1 else 0.0,
+        })
+
+    df_gamma = pd.DataFrame([r for r in results if r["Phase"] == "gamma"])
+    best_gamma = df_gamma.sort_values("STATIC Mean (%)", ascending=False).iloc[0]["gamma"]
+
+    # == (3) eps 스윕: best_lr, best_gamma 고정 ==
+    for eps_val in eps_candidates:
+        static_returns = []
+        for run_idx in range(runs_per_config):
+            np.random.seed(base_seed + 200 + run_idx)
+            agent_u = RecommendationAgent(env, use_constraints=False, lr=best_lr, gamma=best_gamma, eps=eps_val)
+            agent_s = RecommendationAgent(env, use_constraints=True, lr=best_lr, gamma=best_gamma, eps=eps_val)
+
+            h_s = 0.0
+
+            for i in range(20, 20 + episodes_sweep):
+                _, _, r_u = agent_u.select_action(current_step=i)
+                _, _, r_s = agent_s.select_action(current_step=i)
+                h_s += r_s
+
+            static_returns.append(h_s)
+
+        results.append({
+            "Phase": "eps",
+            "lr": best_lr,
+            "gamma": best_gamma,
+            "eps": eps_val,
+            "STATIC Mean (%)": np.mean(static_returns),
+            "STATIC Median (%)": float(np.median(static_returns)),
+            "STATIC Std (%)": float(np.std(static_returns)) if len(static_returns) > 1 else 0.0,
+        })
+
+    st.session_state.sweep_results = results
+
+if st.session_state.sweep_results:
+    df_res = pd.DataFrame(st.session_state.sweep_results)
+
+    st.markdown("#### Sweep Summary (STATIC 기준)")
+    st.dataframe(
+        df_res[["Phase", "lr", "gamma", "eps", "STATIC Mean (%)", "STATIC Median (%)", "STATIC Std (%)"]]
+        .sort_values(["Phase", "STATIC Mean (%)"], ascending=[True, False])
+        .reset_index(drop=True),
+        use_container_width=True,
+        height=400,
+    )
+
+    # 최종 추천 파라미터 (eps 단계에서 최고 조합)
+    df_eps = df_res[df_res["Phase"] == "eps"].sort_values("STATIC Mean (%)", ascending=False)
+    if not df_eps.empty:
+        best_row = df_eps.iloc[0]
+        st.success(
+            f"추천 파라미터 조합 → lr={best_row['lr']}, γ={best_row['gamma']}, ε={best_row['eps']} "
+            f"(STATIC Mean: {best_row['STATIC Mean (%)']:.2f}%, Median: {best_row['STATIC Median (%)']:.2f}%)"
+        )
 
 # == 📊 하단: 통계 분석 고도화 (누적 그래프 및 박스 플롯) ==
 if len(st.session_state.trial_history) > 0:
@@ -202,13 +366,22 @@ if len(st.session_state.trial_history) > 0:
 
         fig_box.update_layout(
             title=dict(text="<b>Return Distribution across Trials</b>", font=dict(size=26, family="Arial Black")),
-            yaxis=dict(title="<b>Final Return (%)</b>", titlefont=dict(size=22, family="Arial Black"), tickfont=dict(size=18, family="Arial Black")),
-            xaxis=dict(
-                title="<b>Performance Metrics</b>", titlefont=dict(size=22, family="Arial Black"),
-                tickmode='array', tickvals=[1.0, 2.25], ticktext=['<b>Vanilla RL</b>', '<b>STATIC RL (Ours)</b>'],
-                tickfont=dict(size=18, family="Arial Black"), range=[0, 3.0]
+            yaxis=dict(
+                title=dict(text="<b>Final Return (%)</b>", font=dict(size=22, family="Arial Black")),
+                tickfont=dict(size=18, family="Arial Black"),
             ),
-            plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=550, margin=dict(t=120, b=100, l=80, r=80)
+            xaxis=dict(
+                title=dict(text="<b>Performance Metrics</b>", font=dict(size=22, family="Arial Black")),
+                tickmode='array',
+                tickvals=[1.0, 2.25],
+                ticktext=['<b>Vanilla RL</b>', '<b>STATIC RL (Ours)</b>'],
+                tickfont=dict(size=18, family="Arial Black"),
+                range=[0, 3.0],
+            ),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            height=550,
+            margin=dict(t=120, b=100, l=80, r=80),
         )
         fig_box.add_hline(y=0, line_width=2, line_color="rgba(150,150,150,0.8)")
         st.plotly_chart(fig_box, use_container_width=True)
