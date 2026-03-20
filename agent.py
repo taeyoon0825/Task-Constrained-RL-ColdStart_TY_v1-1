@@ -81,13 +81,21 @@ class RecommendationAgent:
         self.epsilon = eps
         
     def select_action(self, current_step):
-        logits = np.random.randn(self.env.vocab_size)
         engine = StaticConstraintEngine(self.env, current_step)
-        
-        if self.use_constraints:
-            logits = engine.apply_mask(logits)
-            
-        chosen_action = int(np.argmax(logits))
+        mask = engine.valid_mask if self.use_constraints else np.ones(self.env.vocab_size, dtype=bool)
+
+        # ε-greedy: ε 비율로 유효 행동 무작위 탐색, 나머지는 기존 랜덤 로짓 argmax
+        if np.random.random() < self.epsilon:
+            idx = np.flatnonzero(mask)
+            if len(idx) == 0:
+                chosen_action = int(np.random.randint(0, self.env.vocab_size))
+            else:
+                chosen_action = int(np.random.choice(idx))
+        else:
+            logits = np.random.randn(self.env.vocab_size)
+            if self.use_constraints:
+                logits = engine.apply_mask(logits)
+            chosen_action = int(np.argmax(logits))
         
         if current_step + 1 < len(self.env.data):
             current_price = float(self.env.data[self.env.tickers[chosen_action]].iloc[current_step])
@@ -100,3 +108,132 @@ class RecommendationAgent:
         chosen_ticker = self.env.tickers[chosen_action]
         
         return chosen_ticker, is_valid, reward
+
+
+def _masked_argmax(q_values: np.ndarray, valid_mask: np.ndarray) -> int:
+    """유효한 행동 중에서만 argmax. 모두 무효면 전체 argmax."""
+    masked = np.where(valid_mask, q_values, -np.inf)
+    if not np.any(np.isfinite(masked)):
+        return int(np.argmax(q_values))
+    return int(np.argmax(masked))
+
+
+def _random_valid_action(valid_mask: np.ndarray, rng: np.random.Generator) -> int:
+    """마스크가 True인 인덱스 중 균등 랜덤."""
+    idx = np.flatnonzero(valid_mask)
+    if len(idx) == 0:
+        return int(rng.integers(0, len(valid_mask)))
+    return int(rng.choice(idx))
+
+
+class QLearningBanditAgent:
+    """
+    단일 상태(밴딧) Q-Learning. 종목 선택을 Q(a)로 학습.
+    use_constraints=True 이면 StaticConstraintEngine 마스크를 탐색/그리디에 적용.
+    """
+
+    def __init__(self, env, use_constraints: bool = False, lr: float = 0.1, gamma: float = 0.98, epsilon: float = 0.2):
+        self.env = env
+        self.use_constraints = use_constraints
+        self.lr = lr
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.q = np.zeros(env.vocab_size, dtype=np.float64)
+
+    def reset(self):
+        self.q = np.zeros(self.env.vocab_size, dtype=np.float64)
+
+    def _step_reward(self, action: int, current_step: int) -> float:
+        if current_step + 1 >= len(self.env.data):
+            return 0.0
+        t = self.env.tickers[action]
+        p0 = float(self.env.data[t].iloc[current_step])
+        p1 = float(self.env.data[t].iloc[current_step + 1])
+        if p0 <= 0:
+            return 0.0
+        return ((p1 - p0) / p0) * 100.0
+
+    def train_step(self, current_step: int, rng: np.random.Generator) -> None:
+        engine = StaticConstraintEngine(self.env, current_step)
+        mask = engine.valid_mask if self.use_constraints else np.ones(self.env.vocab_size, dtype=bool)
+
+        if rng.random() < self.epsilon:
+            a = _random_valid_action(mask, rng)
+        else:
+            a = _masked_argmax(self.q, mask)
+
+        r = self._step_reward(a, current_step)
+        max_q = float(np.max(self.q))
+        self.q[a] += self.lr * (r + self.gamma * max_q - self.q[a])
+
+    def select_action(self, current_step: int, rng: np.random.Generator, greedy: bool = False):
+        """greedy=True: 실행(평가) 구간에서 ε=0에 가깝게 고정 그리디."""
+        engine = StaticConstraintEngine(self.env, current_step)
+        mask = engine.valid_mask if self.use_constraints else np.ones(self.env.vocab_size, dtype=bool)
+        eps = 0.0 if greedy else self.epsilon
+
+        if eps > 0 and rng.random() < eps:
+            a = _random_valid_action(mask, rng)
+        else:
+            a = _masked_argmax(self.q, mask)
+
+        r = self._step_reward(a, current_step)
+        is_valid = engine.valid_mask[a]
+        ticker = self.env.tickers[a]
+        return ticker, is_valid, r
+
+
+class PolicyGradientBanditAgent:
+    """
+    REINFORCE 스타일 밴딧: softmax 정책 π(a)를 일일 보상으로 업데이트.
+    use_constraints=True이면 마스크 밖 로짓을 -inf로 두고 정규화.
+    """
+
+    def __init__(self, env, use_constraints: bool = False, lr: float = 0.05):
+        self.env = env
+        self.use_constraints = use_constraints
+        self.lr = lr
+        self.theta = np.zeros(env.vocab_size, dtype=np.float64)
+
+    def reset(self):
+        self.theta = np.zeros(self.env.vocab_size, dtype=np.float64)
+
+    def _step_reward(self, action: int, current_step: int) -> float:
+        if current_step + 1 >= len(self.env.data):
+            return 0.0
+        t = self.env.tickers[action]
+        p0 = float(self.env.data[t].iloc[current_step])
+        p1 = float(self.env.data[t].iloc[current_step + 1])
+        if p0 <= 0:
+            return 0.0
+        return ((p1 - p0) / p0) * 100.0
+
+    def _probs(self, current_step: int, rng: np.random.Generator) -> np.ndarray:
+        engine = StaticConstraintEngine(self.env, current_step)
+        mask = engine.valid_mask if self.use_constraints else np.ones(self.env.vocab_size, dtype=bool)
+        logits = np.where(mask, self.theta, -1e9)
+        logits = logits - np.max(logits)
+        exp = np.exp(logits)
+        s = exp.sum()
+        if s <= 0 or not np.isfinite(s):
+            p = mask.astype(np.float64)
+            return p / (p.sum() + 1e-12)
+        return exp / s
+
+    def train_step(self, current_step: int, rng: np.random.Generator) -> None:
+        p = self._probs(current_step, rng)
+        a = int(rng.choice(self.env.vocab_size, p=p))
+        r = self._step_reward(a, current_step)
+        # REINFORCE: θ += lr * R * (e_a - π)
+        grad = -p
+        grad[a] += 1.0
+        self.theta += self.lr * r * grad
+
+    def select_action(self, current_step: int, rng: np.random.Generator):
+        p = self._probs(current_step, rng)
+        a = int(rng.choice(self.env.vocab_size, p=p))
+        r = self._step_reward(a, current_step)
+        engine = StaticConstraintEngine(self.env, current_step)
+        is_valid = engine.valid_mask[a]
+        ticker = self.env.tickers[a]
+        return ticker, is_valid, r
